@@ -1,6 +1,7 @@
 #include <stdio.h> 
 #include <stdlib.h>
 #include <string.h>
+// #include "linalgebra.h"
 
 /* 
     This is a parser for a loading a matrix data from file in coo format. 
