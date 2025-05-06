@@ -4,151 +4,20 @@
 #include <math.h>
 #include <time.h>
 #include "parser.h"
+#include "vec.h"
 
 /*
     Compile:
-        gcc -std=c99 -Wall -pedantic -o main main.c
+        gcc -std=c99 -Wall -pedantic -o main main.c vec.c -lm
     Run:
         ./main
-
-    This is a parser for a loading a matrix data from file in coo format.
-    Matrix is divided into:
-        diag:
-        upper:
-        lower (symmetric)
-    Indes are stored into:
-        upperAddr: i index
-        lowerAddr: j index
-
-        matrix
-{
+    source         2000 ( 0.000000 0.000000 0.000000 0.000000 ...);
     diag            2000 ( -3.29086 -4.0237 -4.00375 -4.01 ...);
     upper           3890 ( 0.864978 1.21294 1.21294 0.943508, ...);
     upperAddr       3890 ( 1 10 190 2 11 191 3, ...);
     lowerAddr       3890 ( 0 0 0 1 1 1 2 2 2 3 3 3 4 4, ...);
 
 */
-// this function returns the value of the matrix at (i,j) position
-double get_matrix_entry(int i,
-                        int j,
-                        int n,
-                        double *diag,
-                        double *upper,
-                        int *i_indexes,
-                        int *j_indexes,
-                        int upper_count)
-{
-
-    if (i == j)
-    {                   // diagonal case
-        return diag[i]; // return simply the i-th (or j-th) value of diag
-    }
-
-    // Matrix is symmetric, so A[i][j] == A[j][i]
-    // switch i and j if i > j
-
-    if (i > j)
-    { // if we are in the lower triangle, switch i and j
-        int temp = i;
-        i = j;
-        j = temp;
-    }
-
-    // Search in upper values
-    for (int k = 0; k < upper_count; ++k)
-    { // iterating all non zero upper values and corringponding indexes in i_indexes and j_indexes
-        if (i_indexes[k] == i && j_indexes[k] == j)
-        {                    // if the indexes match with reqeusted (i,j)
-            return upper[k]; // return the value
-        }
-    }
-
-    // If not found the value is zero
-    return 0.0;
-}
-
-// COO matrix-vector multiplication
-void mv_coo(int n,               // matrix size (n x n)
-            int coo_length,      // number of non-zero elements in the upper triangular part
-            const double *diag,  // diagonal elements (exactly n dense elements)
-            const double *value, // non-zero elements in the upper triangular part
-            const int *rows,     // i indexes of non-zero elements (value)
-            const int *columns,  // j indexes of non-zero elements (value)
-            const double *v,     // input vector
-            double *out)
-{ // output vector
-
-    // init output vector
-    for (int i = 0; i < n; i++)
-    {
-        out[i] = 0.0;
-    }
-
-    // dense diagonal
-    for (int i = 0; i < n; i++)
-    {
-        out[i] += diag[i] * v[i]; // accumulate the contribution of the diagonal
-    }
-
-    // upper triangular matrix
-    for (int element_index = 0; element_index < coo_length; element_index++)
-    {                                                    // iterate over all non-zero elements in values (top triangular part, by row)
-        const int row_index = rows[element_index];       // i, actual row index of A
-        const int column_index = columns[element_index]; // j, actual column index of A
-        const double val = value[element_index];         // A[i][j]
-        out[row_index] += val * v[column_index];         // out[i] += A[i][j] * v[j]
-        out[column_index] += val * v[row_index];         // out[j] += A[j][i] * v[i]   // symmetric contribution
-    }
-}
-
-// out = a - b
-void vec_sub(double *a, double *b, double *out, int n)
-{
-    for (int i = 0; i < n; i++)
-    {
-        out[i] = a[i] - b[i];
-    }
-}
-
-// out = a + b
-void vec_add(double *a, double *b, double *out, int n)
-{
-    for (int i = 0; i < n; i++)
-    {
-        out[i] = a[i] + b[i];
-    }
-}
-
-// out = a = b
-void vec_assign(double *a, double *b, int n)
-{
-    // for (int i = 0; i < n; i++)
-    // {
-    //     a[i] = b[i];
-    // }
-    memcpy(a, b, n * sizeof(double));
-
-}
-
-// out = a^T * b
-double vec_dot(double *a, double *b, int n)
-{
-    double result = 0.0;
-    for (int i = 0; i < n; i++)
-    {
-        result += a[i] * b[i];
-    }
-    return result;
-}
-
-// out = a + alpha * b
-void vec_axpy(double *a, double *b, double alpha, double *out, int n)
-{
-    for (int i = 0; i < n; i++)
-    {
-        out[i] = a[i] + alpha * b[i];
-    }
-}
 
 /* Solving Ax = b with CG method. */
 int conjugate_gradient(const int n,    // matrix size (n x n)
@@ -174,42 +43,44 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
     }
 
     // Initialize the residual vector r_0 := b - A x_0
-    mv_coo(n, coo_length, diag, upper, rows, cols, x, r);   // A x_0
-    vec_sub(b, r, r, n);    // r_0 = b - A x_0
+    mv_coo(n, coo_length, diag, upper, rows, cols, x, r); // A x_0
+    vec_sub(b, r, r, n);                                  // r_0 = b - A x_0
 
     // Initialize the search direction p_0 := r_0
     vec_assign(p, r, n); // p_0 = r_0
 
-    double r_dot_r_old = vec_dot(r, r, n);  // r_k^T * r_k
+    double r_dot_r_old = vec_dot(r, r, n); // r_k^T * r_k
     double r_dot_r_new = 0.0;
 
-    for(int iter=0; iter < max_iter; iter++){
-        
-        mv_coo(n, coo_length, diag, upper, rows, cols, p, Ap); // Compute: A p_k
-        double alpha = r_dot_r_old / vec_dot(p, Ap, n); // alpha = (r^T * r) / (p^T * A * p)
+    for (int iter = 0; iter < max_iter; iter++)
+    {
 
-        
+        mv_coo(n, coo_length, diag, upper, rows, cols, p, Ap); // Compute: A p_k
+        double alpha = r_dot_r_old / vec_dot(p, Ap, n);        // alpha = (r^T * r) / (p^T * A * p)
+
         vec_axpy(x, p, alpha, x, n); // x_{k+1} = x_k + alpha * p_k
-        
+
         vec_axpy(r, Ap, -alpha, r, n); // r_{k+1} = r_k - alpha * A * p_k
-        
+
         r_dot_r_new = vec_dot(r, r, n); // r_{k+1}^T * r_{k+1}
 
         // Check for convergence
-        if (sqrt(r_dot_r_new) < tol) 
+        if (sqrt(r_dot_r_new) < tol)
         {
             printf("Converged in %d iterations.\n", iter);
             printf("Residual norm: %.5e\n", sqrt(r_dot_r_new));
             // Free allocated memory
-            free(r); free(p); free(Ap);
+            free(r);
+            free(p);
+            free(Ap);
 
-            return iter + 1;        
+            return iter + 1;
         }
-        
+
         double beta = r_dot_r_new / r_dot_r_old; // beta = (r_{k+1}^T * r_{k+1}) / (r_k^T * r_k)
-        
+
         vec_axpy(r, p, beta, p, n); // p_{k+1} = r_{k+1} + beta * p_k
-        
+
         r_dot_r_old = r_dot_r_new; // Update r_dot_r_old for the next iteration
 
         // Print the residual norm every 10 iterations
@@ -220,7 +91,9 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
     printf("Maximum iterations reached without convergence.\n");
     printf("Residual norm: %.5e\n", sqrt(r_dot_r_new));
     // Free allocated memory
-    free(r); free(p); free(Ap);
+    free(r);
+    free(p);
+    free(Ap);
 
     return -1; // Return -1 to indicate failure to converge
 }
@@ -245,67 +118,67 @@ int main()
     int *upperAddr = parseIntArray(file, "upperAddr", &count_upper);
     int *lowerAddr = parseIntArray(file, "lowerAddr", &count_lower);
 
-    // // Print the first few values for each array
-    // if (source)
-    // {
-    //     printf("\n source( \n");
-    //     for (int i = 0; i < 5 && i < count_diag; i++)
-    //         printf("source[%d] = %f\n", i, source[i]);
-    //     printf("...\n");
-    //     // Print the last few values
-    //     for (int i = count_diag - 5; i < count_diag; i++)
-    //         printf("source[%d] = %f\n", i, source[i]);
-    //     printf(")\n");
-    // }
+    // Print the first few values for each array
+    if (source)
+    {
+        printf("\n source( \n");
+        for (int i = 0; i < 5 && i < count_diag; i++)
+            printf("source[%d] = %f\n", i, source[i]);
+        printf("...\n");
+        // Print the last few values
+        for (int i = count_diag - 5; i < count_diag; i++)
+            printf("source[%d] = %f\n", i, source[i]);
+        printf(")\n");
+    }
 
-    // // Print the first few values for each array
-    // if (diag)
-    // {
-    //     printf("\ndiag( \n");
-    //     for (int i = 0; i < 5 && i < count_diag; i++)
-    //         printf("diag[%d] = %f\n", i, diag[i]);
-    //     printf("...\n");
-    //     // Print the last few values
-    //     for (int i = count_diag - 5; i < count_diag; i++)
-    //         printf("diag[%d] = %f\n", i, diag[i]);
-    //     printf(")\n");
-    // }
+    // Print the first few values for each array
+    if (diag)
+    {
+        printf("\ndiag( \n");
+        for (int i = 0; i < 5 && i < count_diag; i++)
+            printf("diag[%d] = %f\n", i, diag[i]);
+        printf("...\n");
+        // Print the last few values
+        for (int i = count_diag - 5; i < count_diag; i++)
+            printf("diag[%d] = %f\n", i, diag[i]);
+        printf(")\n");
+    }
 
-    // if (upper)
-    // {
-    //     printf("\nupper( \n");
-    //     for (int i = 0; i < 5 && i < count_upper; i++)
-    //         printf("upper[%d] = %f\n", i, upper[i]);
-    //     printf("...\n");
-    //     // Print the last few values
-    //     for (int i = count_upper - 5; i < count_upper; i++)
-    //         printf("upper[%d] = %f\n", i, upper[i]);
-    //     printf(")\n");
-    // }
+    if (upper)
+    {
+        printf("\nupper( \n");
+        for (int i = 0; i < 5 && i < count_upper; i++)
+            printf("upper[%d] = %f\n", i, upper[i]);
+        printf("...\n");
+        // Print the last few values
+        for (int i = count_upper - 5; i < count_upper; i++)
+            printf("upper[%d] = %f\n", i, upper[i]);
+        printf(")\n");
+    }
 
-    // if (upperAddr)
-    // {
-    //     printf("\nupperAddr ( \n");
-    //     for (int i = 0; i < 5 && i < count_lower; i++)
-    //         printf("upperAddr[%d] = %d\n", i, upperAddr[i]);
-    //     printf("...\n");
-    //     // Print the last few values
-    //     for (int i = count_lower - 5; i < count_lower; i++)
-    //         printf("upperAddr[%d] = %d\n", i, upperAddr[i]);
-    //     printf(")\n");
-    // }
+    if (upperAddr)
+    {
+        printf("\nupperAddr ( \n");
+        for (int i = 0; i < 5 && i < count_lower; i++)
+            printf("upperAddr[%d] = %d\n", i, upperAddr[i]);
+        printf("...\n");
+        // Print the last few values
+        for (int i = count_lower - 5; i < count_lower; i++)
+            printf("upperAddr[%d] = %d\n", i, upperAddr[i]);
+        printf(")\n");
+    }
 
-    // if (lowerAddr)
-    // {
-    //     printf("\nlowerAddr ( \n");
-    //     for (int i = 0; i < 5 && i < count_lower; i++)
-    //         printf("lowerAddr[%d] = %d\n", i, lowerAddr[i]);
-    //     printf("...\n");
-    //     // Print the last few values
-    //     for (int i = count_lower - 5; i < count_lower; i++)
-    //         printf("lowerAddr[%d] = %d\n", i, lowerAddr[i]);
-    //     printf(")\n");
-    // }
+    if (lowerAddr)
+    {
+        printf("\nlowerAddr ( \n");
+        for (int i = 0; i < 5 && i < count_lower; i++)
+            printf("lowerAddr[%d] = %d\n", i, lowerAddr[i]);
+        printf("...\n");
+        // Print the last few values
+        for (int i = count_lower - 5; i < count_lower; i++)
+            printf("lowerAddr[%d] = %d\n", i, lowerAddr[i]);
+        printf(")\n");
+    }
 
     // ---------------------------------------------------------------------------------------------------------------------------------------------- //
 
@@ -313,35 +186,40 @@ int main()
     double *x = (double *)malloc(count_diag * sizeof(double));
 
     // Time the conjugate gradient method
-    //Start the timer
+    // Start the timer
     clock_t start = clock();
     int result = conjugate_gradient(
-        count_diag, // matrix size (n x n)
-        diag,       // diagonal elements (exactly n dense elements)
+        count_diag,  // matrix size (n x n)
+        diag,        // diagonal elements (exactly n dense elements)
         count_upper, // number of non-zero elements in the upper triangular part
-        upper,      // non-zero elements in the upper triangular part
-        upperAddr,  // i indexes of non-zero elements (upper)
-        lowerAddr,  // j indexes of non-zero elements (upper)
-        source,     // input vector
-        x,     // output vector
-        1000,       // maximum number of iterations
-        1e-6);      // tolerance for convergence
+        upper,       // non-zero elements in the upper triangular part
+        upperAddr,   // i indexes of non-zero elements (upper)
+        lowerAddr,   // j indexes of non-zero elements (upper)
+        source,      // input vector
+        x,           // output vector
+        1000,        // maximum number of iterations
+        1e-6);       // tolerance for convergence
     // Stop the timer
     clock_t end = clock();
     double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
     printf("Time spent: %f seconds\n", time_spent);
-    if (result >= 0) {
+    if (result >= 0)
+    {
         // print some values of x
-        for (int i = 0; i < 5 && i < count_diag; i++) {
+        for (int i = 0; i < 5 && i < count_diag; i++)
+        {
             printf("x[%d] = %.10f\n", i, x[i]);
         }
         printf("...\n");
         // Print the last few values
-        for (int i = count_diag - 5; i < count_diag; i++) {
+        for (int i = count_diag - 5; i < count_diag; i++)
+        {
             printf("x[%d] = %.10f\n", i, x[i]);
         }
         printf(")\n");
-    } else {
+    }
+    else
+    {
         printf("Didnt reach convergences init max_iter.\n");
     }
     // Tests: -------------------------------------------------------------------------------------------------------------------------------------------- //
