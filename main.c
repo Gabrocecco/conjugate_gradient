@@ -5,13 +5,18 @@
 #include <time.h>
 #include "parser.h"
 #include "vec.h"
+#include "tests.h"
+
+int conjugate_gradient(const int n, double *diag, int coo_length, double *upper,
+                       int *rows, int *cols, double *b, double *x,
+                       int max_iter, double tol);
 
 /*
     Compile:
-        gcc -std=c99 -Wall -pedantic -o main main.c vec.c -lm
+        gcc -std=c99 -Wall -pedantic -o main main.c tests.c parser.c vec.c -lm -g -fsanitize=address
     Run:
         ./main
-    source         2000 ( 0.000000 0.000000 0.000000 0.000000 ...);
+    source          2000 ( 0.000000 0.000000 0.000000 0.000000 ...);
     diag            2000 ( -3.29086 -4.0237 -4.00375 -4.01 ...);
     upper           3890 ( 0.864978 1.21294 1.21294 0.943508, ...);
     upperAddr       3890 ( 1 10 190 2 11 191 3, ...);
@@ -67,7 +72,6 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
         // Check for convergence
         if (sqrt(r_dot_r_new) < tol)
         {
-            printf("Converged in %d iterations.\n", iter);
             printf("Residual norm: %.5e\n", sqrt(r_dot_r_new));
             // Free allocated memory
             free(r);
@@ -222,6 +226,17 @@ int main()
     {
         printf("Didnt reach convergences init max_iter.\n");
     }
+
+    free(x);
+
+    // test_zero_matrix();
+
+    test_identity_matrix();
+
+    test_uniform_matrix();
+
+    test_sparse_symmetric_random_matrix();
+
     // Tests: -------------------------------------------------------------------------------------------------------------------------------------------- //
 
     // printing whole matrix

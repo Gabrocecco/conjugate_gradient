@@ -1,5 +1,3 @@
-#ifndef VEC_H
-#define VEC_H
 
 #include <stdlib.h>
 #include <string.h>
@@ -38,5 +36,3 @@ double vec_dot(double *a, double *b, int n);
 
 // AXPY operation: out = a + alpha * b
 void vec_axpy(double *a, double *b, double alpha, double *out, int n);
-
-#endif // VEC_H
