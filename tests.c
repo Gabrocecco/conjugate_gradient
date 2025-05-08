@@ -6,9 +6,11 @@
 #include "main.h" // Include the declaration of conjugate_gradient
 #include "time.h"
 
+
 // Test CG with a zero matrix
 void test_zero_matrix()
-{
+{   
+    clock_t start = clock();
     printf("\n--- Test: Zero Matrix ---\n");
 
     int n = 2000;                             // Dimensione della matrice
@@ -68,12 +70,17 @@ void test_zero_matrix()
     free(b);
     free(x);
 
+    clock_t end = clock();
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("Time spent: %f seconds\n", time_spent);
     printf("--- End of Test: Zero Matrix ---\n");
+    
 }
 
 // Test CG with an identity matrix
 void test_identity_matrix()
 {
+    clock_t start = clock();
     printf("\n--- Test: Identity Matrix ---\n");
 
     int n = 2000;                              // Dimensione della matrice
@@ -139,12 +146,16 @@ void test_identity_matrix()
     free(b);
     free(x);
 
+    clock_t end = clock();
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("Time spent: %f seconds\n", time_spent);
     printf("--- End of Test: Identity Matrix ---\n");
 }
 
 // Test CG with a matrix where every element is 1/n
 void test_uniform_matrix()
 {
+    clock_t start = clock();
     printf("\n--- Test: Uniform Matrix (1/n) ---\n");
 
     int n = 2000; // Dimensione della matrice
@@ -229,6 +240,9 @@ void test_uniform_matrix()
     free(b);
     free(x);
 
+    clock_t end = clock();
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("Time spent: %f seconds\n", time_spent);
     printf("--- End of Test: Uniform Matrix (1/n) ---\n");
 }
 
@@ -237,6 +251,7 @@ void test_uniform_matrix()
 // Test CG with a sparse symmetric matrix with random values
 void test_sparse_symmetric_random_matrix()
 {
+    clock_t start = clock();
     printf("\n--- Test: Sparse Symmetric Random Matrix ---\n");
 
     int n = 2000; // Matrix size
@@ -331,5 +346,8 @@ void test_sparse_symmetric_random_matrix()
     free(b);
     free(x);
 
+    clock_t end = clock();
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("Time spent: %f seconds\n", time_spent);
     printf("--- End of Test: Sparse Symmetric Random Matrix ---\n");
 }
