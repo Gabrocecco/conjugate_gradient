@@ -185,57 +185,65 @@ int main()
     }
 
     // ---------------------------------------------------------------------------------------------------------------------------------------------- //
+    int n_tests = 50;
+    double time_spent_acc = 0;
+    for(int i = 0; i < n_tests; i++)
+    {   
+        printf("Test number :%d\n", i);
+        // initialize the output vector
+        double *x = (double *)malloc(count_diag * sizeof(double));
 
-    // initialize the output vector
-    double *x = (double *)malloc(count_diag * sizeof(double));
+        // Time the conjugate gradient method
+        // Start the timer
+        clock_t start = clock();
+        int result = conjugate_gradient(
+            count_diag,  // matrix size (n x n)
+            diag,        // diagonal elements (exactly n dense elements)
+            count_upper, // number of non-zero elements in the upper triangular part
+            upper,       // non-zero elements in the upper triangular part
+            upperAddr,   // i indexes of non-zero elements (upper)
+            lowerAddr,   // j indexes of non-zero elements (upper)
+            source,      // input vector
+            x,           // output vector
+            1000,        // maximum number of iterations
+            1e-6);       // tolerance for convergence
+        // Stop the timer
+        clock_t end = clock();
+        double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+        time_spent_acc += time_spent;
+        printf("Time spent: %f seconds\n", time_spent);
+        // if (result >= 0)
+        // {
+        //     // print some values of x
+        //     for (int i = 0; i < 5 && i < count_diag; i++)
+        //     {
+        //         printf("x[%d] = %.10f\n", i, x[i]);
+        //     }
+        //     printf("...\n");
+        //     // Print the last few values
+        //     for (int i = count_diag - 5; i < count_diag; i++)
+        //     {
+        //         printf("x[%d] = %.10f\n", i, x[i]);
+        //     }
+        //     printf(")\n");
+        // }
+        // else
+        // {
+        //     printf("Didnt reach convergences init max_iter.\n");
+        // }
 
-    // Time the conjugate gradient method
-    // Start the timer
-    clock_t start = clock();
-    int result = conjugate_gradient(
-        count_diag,  // matrix size (n x n)
-        diag,        // diagonal elements (exactly n dense elements)
-        count_upper, // number of non-zero elements in the upper triangular part
-        upper,       // non-zero elements in the upper triangular part
-        upperAddr,   // i indexes of non-zero elements (upper)
-        lowerAddr,   // j indexes of non-zero elements (upper)
-        source,      // input vector
-        x,           // output vector
-        1000,        // maximum number of iterations
-        1e-6);       // tolerance for convergence
-    // Stop the timer
-    clock_t end = clock();
-    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("Time spent: %f seconds\n", time_spent);
-    if (result >= 0)
-    {
-        // print some values of x
-        for (int i = 0; i < 5 && i < count_diag; i++)
-        {
-            printf("x[%d] = %.10f\n", i, x[i]);
-        }
-        printf("...\n");
-        // Print the last few values
-        for (int i = count_diag - 5; i < count_diag; i++)
-        {
-            printf("x[%d] = %.10f\n", i, x[i]);
-        }
-        printf(")\n");
+        free(x);
     }
-    else
-    {
-        printf("Didnt reach convergences init max_iter.\n");
-    }
-
-    free(x);
+    printf("-------------------------------------------------------------------\n");
+    printf("Average time spent in %d runs: %f seconds\n", n_tests, time_spent_acc / n_tests);
 
     // test_zero_matrix();
 
-    test_identity_matrix();
+    // test_identity_matrix();
 
-    test_uniform_matrix();
+    // test_uniform_matrix();
 
-    test_sparse_symmetric_random_matrix();
+    // test_sparse_symmetric_random_matrix();
 
     // Tests: -------------------------------------------------------------------------------------------------------------------------------------------- //
 
