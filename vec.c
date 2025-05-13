@@ -113,6 +113,16 @@ double vec_dot(double *a, double *b, int n)
     return result;
 }
 
+double vec_l1norm(double *a, int n)
+{
+    double result = 0.0;
+    for (int i = 0; i < n; i++)
+    {
+        result += fabs(a[i]);
+    }
+    return result;
+}
+
 // out = a + alpha * b
 void vec_axpy(double *a, double *b, double alpha, double *out, int n)
 {
@@ -129,7 +139,7 @@ double rmse(const double *a, const double *b, int n) {
         double diff = a[i] - b[i];
         sum += diff * diff;
     }
-    return sqrt(sum / n);   // return sqrt( 1/n *sum(diff^2))
+    return sqrt(sum / n);   // return sqrt(1/n *sum(diff^2))
 }
 
 // compare two vectors and return the euclidean distance

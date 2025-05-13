@@ -39,6 +39,7 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
 
 )
 {
+    double norm_factor = 2.0;
     double *r = (double *)malloc(n * sizeof(double));
     double *p = (double *)malloc(n * sizeof(double));
     double *Ap = (double *)malloc(n * sizeof(double));
@@ -52,6 +53,9 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
     mv_coo(n, coo_length, diag, upper, rows, cols, x, r); // A x_0
     vec_sub(b, r, r, n);                                  // r_0 = b - A x_0
 
+    // printf("Initial residual norm: %.5e\n", sqrt(vec_dot(r, r, n))); // Print the initial residual norm
+    printf("Initial residual norm: %f\n", (vec_l1norm(r, n) / norm_factor)); // Print the initial residual norm
+
     // Initialize the search direction p_0 := r_0
     vec_assign(p, r, n); // p_0 = r_0
 
@@ -60,7 +64,6 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
 
     for (int iter = 0; iter < max_iter; iter++)
     {
-
         mv_coo(n, coo_length, diag, upper, rows, cols, p, Ap); // Compute: A p_k
         double alpha = r_dot_r_old / vec_dot(p, Ap, n);        // alpha = (r^T * r) / (p^T * A * p)
 
@@ -71,9 +74,11 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
         r_dot_r_new = vec_dot(r, r, n); // r_{k+1}^T * r_{k+1}
 
         // If r_{k+1} is small enough, we stop
-        if (sqrt(r_dot_r_new) < tol)    // if sqrt(r_{k+1}^T * r_{k+1}) < tol
+        // if (sqrt(r_dot_r_new) < tol)    // if sqrt(r_{k+1}^T * r_{k+1}) < tol
+        if ((vec_l1norm(r, n) / norm_factor) < tol)
         {
-            printf("\nResidual norm: %.5e\n", sqrt(r_dot_r_new));
+            // printf("\nResidual norm: %.5e\n", sqrt(r_dot_r_new));
+            printf("\nResidual norm: %.g\n", (vec_l1norm(r, n) / norm_factor));
             // Free allocated memory
             free(r);
             free(p);
@@ -89,12 +94,14 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
         r_dot_r_old = r_dot_r_new; // Update r_dot_r_old for the next iteration
 
         // Print the residual norm every 10 iterations
-        if (iter % 20 == 0)
-            printf("Iteration %d: Residual norm = %.5e\n", iter, sqrt(r_dot_r_new));
+        // if (iter % 20 == 0 && iter > 0)
+        // printf("Iteration %d: Residual norm = %.5e\n", iter, sqrt(r_dot_r_new));
+        printf("Iteration %d: Residual norm = %g\n", iter, (vec_l1norm(r, n) / norm_factor));
     }
 
     printf("Maximum iterations reached without convergence.\n");
-    printf("Residual norm: %.5e\n", sqrt(r_dot_r_new));
+    // printf("Residual norm: %.5e\n", sqrt(r_dot_r_new));
+    printf("Residual norm: %g\n", (vec_l1norm(r, n) / norm_factor));
     // Free allocated memory
     free(r);
     free(p);
@@ -106,7 +113,8 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
 int main()
 {
 
-    const char *filename = "Phi.3.system";
+    // const char *filename = "Phi.3.system";
+    const char *filename = "data.txt";
     FILE *file = fopen(filename, "r");
     if (!file)
     {
@@ -114,14 +122,14 @@ int main()
         return -1;
     }
 
-    const char *filenameOpenfoam = "Phi.txt";
+    const char *filenameOpenfoam = "Phi";
     FILE *fileOpenfoam = fopen(filenameOpenfoam, "r");
     if (!filenameOpenfoam)
     {
         perror("Error in opening file");
         return -1;
     }
-    else 
+    else
     {
         printf("File %s opened successfully.\n", filenameOpenfoam);
     }
@@ -134,8 +142,8 @@ int main()
     double *upper = parseDoubleArray(file, "upper", &count_upper);
     int *upperAddr = parseIntArray(file, "upperAddr", &count_upper);
     int *lowerAddr = parseIntArray(file, "lowerAddr", &count_lower);
-    
-    double *openFoamSolution = parseDoubleArraySolution(fileOpenfoam, "solution", &count_solution_openfoam);        // Parse solution from openFoam 
+
+    double *openFoamSolution = parseDoubleArraySolution(fileOpenfoam, "solution", &count_solution_openfoam); // Parse solution from openFoam
 
     printf("\n%d\n", count_solution_openfoam);
     // Print the first few values for each array
@@ -212,12 +220,12 @@ int main()
     }
 
     // ---------------------------------------------------------------------------------------------------------------------------------------------- //
-    int n_tests = 10;
+    int n_tests = 1;
     double time_spent_acc = 0;
     printf("-------------------------------------------------------------------\n\n");
-    for(int i = 0; i < n_tests; i++)
-    {   
-        printf("Begin test number %d\n\n", i+1);
+    for (int i = 0; i < n_tests; i++)
+    {
+        printf("Begin test number %d\n\n", i + 1);
         // initialize the output vector
         double *x = (double *)malloc(count_diag * sizeof(double));
 
@@ -243,7 +251,7 @@ int main()
         double max_component_diff = max_difference(x, openFoamSolution, count_diag);
         printf("Time spent: %f seconds\n", time_spent);
         if (iterations >= 0)
-        {   
+        {
             printf("Converged in %d iterations.\n\n", iterations);
             // print some values of x
             for (int i = 0; i < 5 && i < count_diag; i++)
@@ -273,7 +281,7 @@ int main()
         }
 
         free(x);
-        printf("End of test number %d\n", i+1);
+        printf("End of test number %d\n", i + 1);
         printf("-------------------------------------------------------------------\n\n");
     }
     printf("\n-------------------------------------------------------------------\n");

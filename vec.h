@@ -43,4 +43,5 @@ double euclidean_distance(const double *a, const double *b, int n);
 
 double max_difference(const double *a, const double *b, int n);
 
+double vec_l1norm(double *a, int n);
 

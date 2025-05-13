@@ -255,7 +255,7 @@ void test_sparse_symmetric_random_matrix()
     printf("\n--- Test: Sparse Symmetric Random Matrix ---\n");
 
     int n = 2000; // Matrix size
-    int non_zero_elements = n * 20; // Approximate number of non-zero elements
+    int non_zero_elements = n * 3; // Approximate number of non-zero elements
     printf("Matrix size: %d x %d\n", n, n);
     printf("Number of non-zero elements: %d\n", non_zero_elements);
     printf("Density: %.2f%%\n", (double)non_zero_elements / (n * n) * 100);
@@ -351,3 +351,13 @@ void test_sparse_symmetric_random_matrix()
     printf("Time spent: %f seconds\n", time_spent);
     printf("--- End of Test: Sparse Symmetric Random Matrix ---\n");
 }
+
+
+// int main(){
+
+//     test_identity_matrix();
+
+//     test_uniform_matrix();
+
+//     return 0;
+// }
