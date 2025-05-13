@@ -129,7 +129,7 @@ double rmse(const double *a, const double *b, int n) {
         double diff = a[i] - b[i];
         sum += diff * diff;
     }
-    return sqrt(sum / n);
+    return sqrt(sum / n);   // return sqrt( 1/n *sum(diff^2))
 }
 
 // compare two vectors and return the euclidean distance

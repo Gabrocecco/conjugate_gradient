@@ -73,7 +73,7 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
         // If r_{k+1} is small enough, we stop
         if (sqrt(r_dot_r_new) < tol)    // if sqrt(r_{k+1}^T * r_{k+1}) < tol
         {
-            printf("Residual norm: %.5e\n", sqrt(r_dot_r_new));
+            printf("\nResidual norm: %.5e\n", sqrt(r_dot_r_new));
             // Free allocated memory
             free(r);
             free(p);
@@ -106,7 +106,7 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
 int main()
 {
 
-    const char *filename = "data.txt";
+    const char *filename = "Phi.3.system";
     FILE *file = fopen(filename, "r");
     if (!file)
     {
@@ -214,13 +214,10 @@ int main()
     // ---------------------------------------------------------------------------------------------------------------------------------------------- //
     int n_tests = 10;
     double time_spent_acc = 0;
-    double rmse_value_acc = 0;
-    double euclidean_distance_value_acc = 0;
-    double max_diff_acc = 0;
-    printf("-------------------------------------------------------------------\n");
+    printf("-------------------------------------------------------------------\n\n");
     for(int i = 0; i < n_tests; i++)
     {   
-        printf("Test number :%d\n", i);
+        printf("Begin test number %d\n\n", i+1);
         // initialize the output vector
         double *x = (double *)malloc(count_diag * sizeof(double));
 
@@ -242,33 +239,33 @@ int main()
         clock_t end = clock();
         double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
         time_spent_acc += time_spent;
+        double diff = 0;
+        double max_component_diff = max_difference(x, openFoamSolution, count_diag);
         printf("Time spent: %f seconds\n", time_spent);
         if (iterations >= 0)
         {   
-            printf("Converged in %d iterations.\n", iterations);
+            printf("Converged in %d iterations.\n\n", iterations);
             // print some values of x
             for (int i = 0; i < 5 && i < count_diag; i++)
             {
-                printf("x[%d] = %.10f\n", i, x[i]);
+                diff = x[i] - openFoamSolution[i];
+                printf("x[%d] = %.10f | OpenFoam: x[%d] = %.10f | difference: %f | %.3f%%\n", i, x[i], i, openFoamSolution[i], diff, diff * 100);
             }
             printf("...\n");
             // Print the last few values
             for (int i = count_diag - 5; i < count_diag; i++)
             {
-                printf("x[%d] = %.10f\n", i, x[i]);
+                diff = x[i] - openFoamSolution[i];
+                printf("x[%d] = %.10f | OpenFoam: x[%d] = %.10f | difference: %f | %.3f%%\n", i, x[i], i, openFoamSolution[i], diff, diff * 100);
             }
             printf(")\n");
 
             // Check the result against the OpenFOAM solution
             double rmse_value = rmse(x, openFoamSolution, count_diag);
             double euclidean_distance_value = euclidean_distance(x, openFoamSolution, count_diag);
-            double max_diff = max_difference(x, openFoamSolution, count_diag);
-            rmse_value_acc += rmse_value;
-            euclidean_distance_value_acc += euclidean_distance_value;
-            max_diff_acc += max_diff;
             printf("RMSE: %f\n", rmse_value);
             printf("Euclidean distance: %f\n", euclidean_distance_value);
-            printf("Max difference: %f\n", max_diff);
+            printf("Max component difference: %f\n", max_component_diff);
         }
         else
         {
@@ -276,12 +273,14 @@ int main()
         }
 
         free(x);
+        printf("End of test number %d\n", i+1);
+        printf("-------------------------------------------------------------------\n\n");
     }
+    printf("\n-------------------------------------------------------------------\n");
     printf("-------------------------------------------------------------------\n");
+    printf("SUMMARY of %d runs: \n", n_tests);
     printf("Average time spent in %d runs: %f seconds\n", n_tests, time_spent_acc / n_tests);
-    printf("Average RMSE in %d runs: %f\n", n_tests, rmse_value_acc / n_tests);
-    printf("Average Euclidean distance in %d runs: %f\n", n_tests, euclidean_distance_value_acc / n_tests);
-    printf("Average max difference in %d runs: %f\n", n_tests, max_diff_acc / n_tests);
+    printf("-------------------------------------------------------------------\n");
     printf("-------------------------------------------------------------------\n");
 
     // test_zero_matrix();
