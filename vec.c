@@ -1,4 +1,5 @@
 #include "vec.h"
+#include <math.h>
 
 // this function returns the value of the matrix at (i,j) position
 double get_matrix_entry(int i,
@@ -119,4 +120,36 @@ void vec_axpy(double *a, double *b, double alpha, double *out, int n)
     {
         out[i] = a[i] + alpha * b[i];
     }
+}
+
+// compare two vectors and return the root mean square error
+double rmse(const double *a, const double *b, int n) {
+    double sum = 0.0;
+    for (int i = 0; i < n; i++) {
+        double diff = a[i] - b[i];
+        sum += diff * diff;
+    }
+    return sqrt(sum / n);
+}
+
+// compare two vectors and return the euclidean distance
+double euclidean_distance(const double *a, const double *b, int n) {
+    double sum = 0.0;
+    for (int i = 0; i < n; i++) {
+        double diff = a[i] - b[i];
+        sum += diff * diff;
+    }
+    return sqrt(sum);
+}
+
+// compare two vectors and return the maximum difference
+double max_difference(const double *a, const double *b, int n) {
+    double max_diff = 0.0;
+    for (int i = 0; i < n; i++) {
+        double diff = fabs(a[i] - b[i]);
+        if (diff > max_diff) {
+            max_diff = diff;
+        }
+    }
+    return max_diff;
 }

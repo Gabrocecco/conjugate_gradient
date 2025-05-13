@@ -14,6 +14,7 @@ int conjugate_gradient(const int n, double *diag, int coo_length, double *upper,
 /*
     Compile:
         gcc -std=c99 -Wall -pedantic -o main main.c tests.c parser.c vec.c -lm -g -fsanitize=address
+        gcc -std=c99 -Wall -pedantic -o main main.c tests.c parser.c vec.c -lm -O3 -DNDEBUG -march=native -mtune=native -v
     Run:
         ./main
     source          2000 ( 0.000000 0.000000 0.000000 0.000000 ...);
@@ -65,12 +66,12 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
 
         vec_axpy(x, p, alpha, x, n); // x_{k+1} = x_k + alpha * p_k
 
-        vec_axpy(r, Ap, -alpha, r, n); // r_{k+1} = r_k - alpha * A * p_k
+        vec_axpy(r, Ap, -alpha, r, n); // r_{k+1} = r_k - alpha * A p_k
 
         r_dot_r_new = vec_dot(r, r, n); // r_{k+1}^T * r_{k+1}
 
-        // Check for convergence
-        if (sqrt(r_dot_r_new) < tol)
+        // If r_{k+1} is small enough, we stop
+        if (sqrt(r_dot_r_new) < tol)    // if sqrt(r_{k+1}^T * r_{k+1}) < tol
         {
             printf("Residual norm: %.5e\n", sqrt(r_dot_r_new));
             // Free allocated memory
@@ -88,7 +89,7 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
         r_dot_r_old = r_dot_r_new; // Update r_dot_r_old for the next iteration
 
         // Print the residual norm every 10 iterations
-        if (iter % 10 == 0)
+        if (iter % 20 == 0)
             printf("Iteration %d: Residual norm = %.5e\n", iter, sqrt(r_dot_r_new));
     }
 
@@ -113,7 +114,19 @@ int main()
         return -1;
     }
 
-    int count_diag = 0, count_upper = 0, count_lower = 0;
+    const char *filenameOpenfoam = "Phi.txt";
+    FILE *fileOpenfoam = fopen(filenameOpenfoam, "r");
+    if (!filenameOpenfoam)
+    {
+        perror("Error in opening file");
+        return -1;
+    }
+    else 
+    {
+        printf("File %s opened successfully.\n", filenameOpenfoam);
+    }
+
+    int count_diag = 0, count_upper = 0, count_lower = 0, count_solution_openfoam = 0;
 
     // Parse all sections in a single file pass
     double *source = parseDoubleArray(file, "source", &count_diag);
@@ -121,7 +134,10 @@ int main()
     double *upper = parseDoubleArray(file, "upper", &count_upper);
     int *upperAddr = parseIntArray(file, "upperAddr", &count_upper);
     int *lowerAddr = parseIntArray(file, "lowerAddr", &count_lower);
+    
+    double *openFoamSolution = parseDoubleArraySolution(fileOpenfoam, "solution", &count_solution_openfoam);        // Parse solution from openFoam 
 
+    printf("\n%d\n", count_solution_openfoam);
     // Print the first few values for each array
     if (source)
     {
@@ -183,10 +199,25 @@ int main()
             printf("lowerAddr[%d] = %d\n", i, lowerAddr[i]);
         printf(")\n");
     }
+    if (openFoamSolution)
+    {
+        printf("\nopenFoamSolution ( \n");
+        for (int i = 0; i < 5 && i < count_solution_openfoam; i++)
+            printf("openFoamSolution[%d] = %f\n", i, openFoamSolution[i]);
+        printf("...\n");
+        // Print the last few values
+        for (int i = count_solution_openfoam - 5; i < count_solution_openfoam; i++)
+            printf("openFoamSolution[%d] = %f\n", i, openFoamSolution[i]);
+        printf(")\n");
+    }
 
     // ---------------------------------------------------------------------------------------------------------------------------------------------- //
-    int n_tests = 50;
+    int n_tests = 10;
     double time_spent_acc = 0;
+    double rmse_value_acc = 0;
+    double euclidean_distance_value_acc = 0;
+    double max_diff_acc = 0;
+    printf("-------------------------------------------------------------------\n");
     for(int i = 0; i < n_tests; i++)
     {   
         printf("Test number :%d\n", i);
@@ -196,7 +227,7 @@ int main()
         // Time the conjugate gradient method
         // Start the timer
         clock_t start = clock();
-        int result = conjugate_gradient(
+        int iterations = conjugate_gradient(
             count_diag,  // matrix size (n x n)
             diag,        // diagonal elements (exactly n dense elements)
             count_upper, // number of non-zero elements in the upper triangular part
@@ -212,30 +243,46 @@ int main()
         double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
         time_spent_acc += time_spent;
         printf("Time spent: %f seconds\n", time_spent);
-        // if (result >= 0)
-        // {
-        //     // print some values of x
-        //     for (int i = 0; i < 5 && i < count_diag; i++)
-        //     {
-        //         printf("x[%d] = %.10f\n", i, x[i]);
-        //     }
-        //     printf("...\n");
-        //     // Print the last few values
-        //     for (int i = count_diag - 5; i < count_diag; i++)
-        //     {
-        //         printf("x[%d] = %.10f\n", i, x[i]);
-        //     }
-        //     printf(")\n");
-        // }
-        // else
-        // {
-        //     printf("Didnt reach convergences init max_iter.\n");
-        // }
+        if (iterations >= 0)
+        {   
+            printf("Converged in %d iterations.\n", iterations);
+            // print some values of x
+            for (int i = 0; i < 5 && i < count_diag; i++)
+            {
+                printf("x[%d] = %.10f\n", i, x[i]);
+            }
+            printf("...\n");
+            // Print the last few values
+            for (int i = count_diag - 5; i < count_diag; i++)
+            {
+                printf("x[%d] = %.10f\n", i, x[i]);
+            }
+            printf(")\n");
+
+            // Check the result against the OpenFOAM solution
+            double rmse_value = rmse(x, openFoamSolution, count_diag);
+            double euclidean_distance_value = euclidean_distance(x, openFoamSolution, count_diag);
+            double max_diff = max_difference(x, openFoamSolution, count_diag);
+            rmse_value_acc += rmse_value;
+            euclidean_distance_value_acc += euclidean_distance_value;
+            max_diff_acc += max_diff;
+            printf("RMSE: %f\n", rmse_value);
+            printf("Euclidean distance: %f\n", euclidean_distance_value);
+            printf("Max difference: %f\n", max_diff);
+        }
+        else
+        {
+            printf("Didnt reach convergences init max_iter.\n");
+        }
 
         free(x);
     }
     printf("-------------------------------------------------------------------\n");
     printf("Average time spent in %d runs: %f seconds\n", n_tests, time_spent_acc / n_tests);
+    printf("Average RMSE in %d runs: %f\n", n_tests, rmse_value_acc / n_tests);
+    printf("Average Euclidean distance in %d runs: %f\n", n_tests, euclidean_distance_value_acc / n_tests);
+    printf("Average max difference in %d runs: %f\n", n_tests, max_diff_acc / n_tests);
+    printf("-------------------------------------------------------------------\n");
 
     // test_zero_matrix();
 
@@ -376,6 +423,12 @@ int main()
     free(upperAddr);
     free(lowerAddr);
     free(source);
+    free(openFoamSolution);
+
+    fclose(file);
+    fclose(fileOpenfoam);
+    printf("Files closed successfully.\n");
+    printf("End of program.\n");
 
     return 0;
 }

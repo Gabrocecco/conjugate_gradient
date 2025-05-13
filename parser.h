@@ -5,5 +5,6 @@
 
 double *parseDoubleArray(FILE *file, const char *target_word, int *out_count);
 int *parseIntArray(FILE *file, const char *target_word, int *out_count);
+double *parseDoubleArraySolution(FILE *file, const char *target_word, int *out_count);
 
 #endif // PARSER_H

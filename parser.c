@@ -105,3 +105,73 @@ int* parseIntArray(FILE *file, const char *target_word, int *out_count) {
 
     return NULL;
 }
+
+double* parseDoubleArraySolution(FILE *file, const char *target_word, int *out_count) {
+    char line[256];
+    int count = 0;
+    double *values = NULL;
+
+    // read line by line
+    while (fgets(line, sizeof(line), file)) {
+        // check if we found the target word
+        if (strstr(line, target_word)) {
+
+
+            if (!fgets(line, sizeof(line), file)) break;
+
+            // read number of values
+            if (sscanf(line, "%d", &count) != 1) {
+                fprintf(stderr, "Error parsing count after '%s'\n", target_word);
+                return NULL;
+            }
+
+            // waits for the '('
+            do {
+                if (!fgets(line, sizeof(line), file)) {
+                    fprintf(stderr, "Unexpected end of file, '(' not found\n");
+                    return NULL;
+                }
+            } while (strchr(line, '(') == NULL);
+
+            // Alloc memory for values
+            values = malloc(count * sizeof(double));
+            if (!values) {
+                perror("Allocation failed");
+                return NULL;
+            }
+
+            // Read values line by line
+            int i = 0;
+            while (i < count && fgets(line, sizeof(line), file)) {
+                double val;
+                if (sscanf(line, "%lf", &val) != 1) {
+                    fprintf(stderr, "Error parsing value number %d\n", i);
+                    free(values);
+                    return NULL;
+                }
+                values[i++] = val;
+            }
+
+            if (i != count) {
+                fprintf(stderr, "Error reading values of '%s' (read %d, expected %d)\n", target_word, i, count);
+                free(values);
+                return NULL;
+            }
+
+            // waits for the ')'
+            do {
+                if (!fgets(line, sizeof(line), file)) {
+                    fprintf(stderr, "Unexpected end of file, ')' not found\n");
+                    free(values);
+                    return NULL;
+                }
+            } while (strchr(line, ')') == NULL);
+
+            if (out_count) *out_count = count;
+            return values;
+        }
+    }
+
+    // Se target_word non trovata
+    return NULL;
+}
