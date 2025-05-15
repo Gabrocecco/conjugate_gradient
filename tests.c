@@ -3,9 +3,8 @@
 #include <math.h>
 #include "vec.h"
 #include "parser.h"
-#include "main.h" // Include the declaration of conjugate_gradient
 #include "time.h"
-
+#include "cg.h"
 
 // Test CG with a zero matrix
 void test_zero_matrix()
@@ -249,7 +248,7 @@ void test_uniform_matrix()
 #include <time.h> // For random number generation
 
 // Test CG with a sparse symmetric matrix with random values
-void test_sparse_symmetric_random_matrix()
+void test_sparse_symmetric_random_matrix(int matrix_size, int non_zero_elements_upper)
 {
     clock_t start = clock();
     printf("\n--- Test: Sparse Symmetric Random Matrix ---\n");
@@ -353,11 +352,18 @@ void test_sparse_symmetric_random_matrix()
 }
 
 
-// int main(){
+int main(){
 
-//     test_identity_matrix();
+    test_identity_matrix();
 
-//     test_uniform_matrix();
+    test_uniform_matrix();
 
-//     return 0;
-// }
+    // chose a matrix size and number of non-zero elements on the upper triangular part
+    int matrix_size = 2000; // Matrix size
+    int non_zero_elements_upper = matrix_size * 5; // Number of non-zero elements in the upper triangular part
+    test_sparse_symmetric_random_matrix(matrix_size, non_zero_elements_upper);
+
+
+
+    return 0;
+}

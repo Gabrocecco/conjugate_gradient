@@ -6,10 +6,7 @@
 #include "parser.h"
 #include "vec.h"
 #include "tests.h"
-
-int conjugate_gradient(const int n, double *diag, int coo_length, double *upper,
-                       int *rows, int *cols, double *b, double *x,
-                       int max_iter, double tol);
+#include "cg.h"
 
 /*
     Compile:
@@ -25,113 +22,33 @@ int conjugate_gradient(const int n, double *diag, int coo_length, double *upper,
 
 */
 
-/* Solving Ax = b with CG method. */
-int conjugate_gradient(const int n,    // matrix size (n x n)
-                       double *diag,   // diagonal elements (exactly n dense elements)
-                       int coo_length, // number of non-zero elements in the upper triangular part
-                       double *upper,  // non-zero elements in the upper triangular part
-                       int *rows,      // i indexes of non-zero elements in the upper triangular part
-                       int *cols,      // j indexes of non-zero elements in the upper triangular part
-                       double *b,      // input vector
-                       double *x,      // output vector
-                       int max_iter,   // maximum number of iterations
-                       double tol      // tolerance for convergence
-
-)
-{
-    double norm_factor = 2.0;
-    double *r = (double *)malloc(n * sizeof(double));
-    double *p = (double *)malloc(n * sizeof(double));
-    double *Ap = (double *)malloc(n * sizeof(double));
-    // Initialize the solution vector x to zero
-    for (int i = 0; i < n; i++)
-    {
-        x[i] = 0.0;
-    }
-
-    // Initialize the residual vector r_0 := b - A x_0
-    mv_coo(n, coo_length, diag, upper, rows, cols, x, r); // A x_0
-    vec_sub(b, r, r, n);                                  // r_0 = b - A x_0
-
-    // printf("Initial residual norm: %.5e\n", sqrt(vec_dot(r, r, n))); // Print the initial residual norm
-    printf("Initial residual norm: %f\n", (vec_l1norm(r, n) / norm_factor)); // Print the initial residual norm
-
-    // Initialize the search direction p_0 := r_0
-    vec_assign(p, r, n); // p_0 = r_0
-
-    double r_dot_r_old = vec_dot(r, r, n); // r_k^T * r_k
-    double r_dot_r_new = 0.0;
-
-    for (int iter = 0; iter < max_iter; iter++)
-    {
-        mv_coo(n, coo_length, diag, upper, rows, cols, p, Ap); // Compute: A p_k
-        double alpha = r_dot_r_old / vec_dot(p, Ap, n);        // alpha = (r^T * r) / (p^T * A * p)
-
-        vec_axpy(x, p, alpha, x, n); // x_{k+1} = x_k + alpha * p_k
-
-        vec_axpy(r, Ap, -alpha, r, n); // r_{k+1} = r_k - alpha * A p_k
-
-        r_dot_r_new = vec_dot(r, r, n); // r_{k+1}^T * r_{k+1}
-
-        // If r_{k+1} is small enough, we stop
-        // if (sqrt(r_dot_r_new) < tol)    // if sqrt(r_{k+1}^T * r_{k+1}) < tol
-        if ((vec_l1norm(r, n) / norm_factor) < tol)
-        {
-            // printf("\nResidual norm: %.5e\n", sqrt(r_dot_r_new));
-            printf("\nResidual norm: %.g\n", (vec_l1norm(r, n) / norm_factor));
-            // Free allocated memory
-            free(r);
-            free(p);
-            free(Ap);
-
-            return iter + 1;
-        }
-
-        double beta = r_dot_r_new / r_dot_r_old; // beta = (r_{k+1}^T * r_{k+1}) / (r_k^T * r_k)
-
-        vec_axpy(r, p, beta, p, n); // p_{k+1} = r_{k+1} + beta * p_k
-
-        r_dot_r_old = r_dot_r_new; // Update r_dot_r_old for the next iteration
-
-        // Print the residual norm every 10 iterations
-        // if (iter % 20 == 0 && iter > 0)
-        // printf("Iteration %d: Residual norm = %.5e\n", iter, sqrt(r_dot_r_new));
-        printf("Iteration %d: Residual norm = %g\n", iter, (vec_l1norm(r, n) / norm_factor));
-    }
-
-    printf("Maximum iterations reached without convergence.\n");
-    // printf("Residual norm: %.5e\n", sqrt(r_dot_r_new));
-    printf("Residual norm: %g\n", (vec_l1norm(r, n) / norm_factor));
-    // Free allocated memory
-    free(r);
-    free(p);
-    free(Ap);
-
-    return -1; // Return -1 to indicate failure to converge
-}
-
 int main()
 {
-
-    // const char *filename = "Phi.3.system";
-    const char *filename = "data.txt";
+    printf("Start of program.\n");
+    printf("-------------------------------------------------------------------\n");
+    printf("Loading data from file...\n");
+    const char *filename = "data/data.txt";  // linear system data input (COO) filename 
     FILE *file = fopen(filename, "r");
     if (!file)
     {
         perror("Error in opening file");
         return -1;
     }
+    else
+    {
+        printf("File %s opened successfully.\n", filename);
+    }
 
-    const char *filenameOpenfoam = "Phi";
-    FILE *fileOpenfoam = fopen(filenameOpenfoam, "r");
-    if (!filenameOpenfoam)
+    const char *filenameFoamSolution = "data/Phi";   // solution of the linear system from OpenFoam filename 
+    FILE *fileFoamSolution = fopen(filenameFoamSolution, "r");
+    if (!filenameFoamSolution)
     {
         perror("Error in opening file");
         return -1;
     }
     else
     {
-        printf("File %s opened successfully.\n", filenameOpenfoam);
+        printf("File %s opened successfully.\n", filenameFoamSolution);
     }
 
     int count_diag = 0, count_upper = 0, count_lower = 0, count_solution_openfoam = 0;
@@ -143,8 +60,17 @@ int main()
     int *upperAddr = parseIntArray(file, "upperAddr", &count_upper);
     int *lowerAddr = parseIntArray(file, "lowerAddr", &count_lower);
 
-    double *openFoamSolution = parseDoubleArraySolution(fileOpenfoam, "solution", &count_solution_openfoam); // Parse solution from openFoam
+    // Parse solution from openFoam
+    double *openFoamSolution = parseDoubleArraySolution(fileFoamSolution, "internalField   nonuniform List<scalar>", &count_solution_openfoam); 
+    
+    //check if the number of elements in the same dimension as b (source)
+    if (count_diag != count_solution_openfoam)
+    {
+        printf("Error: The number of elements in the solution vector does not match the number of elements in the source vector.\n");
+        return -1;
+    }
 
+    // Print the number of elements in each array
     printf("\n%d\n", count_solution_openfoam);
     // Print the first few values for each array
     if (source)
@@ -301,129 +227,6 @@ int main()
 
     // Tests: -------------------------------------------------------------------------------------------------------------------------------------------- //
 
-    // printing whole matrix
-    // printf("Martix is: %d x %d\n", count_diag, count_diag);
-    // for(int i; i < count_diag; i++){
-    //     for(int j; j < count_diag; j++){
-    //         printf("%lf ", get_matrix_entry(i, j, count_diag, diag, upper, upperAddr, lowerAddr, count_upper));
-    //         if(i == j){
-    //             printf("\n");
-    //         }
-    //     }
-    // }
-
-    // printf("Matrix diag: \n");
-    // for(int i = 0; i < count_diag; i++){
-    //     printf("%lf ", get_matrix_entry(i, i, count_diag, diag, upper, upperAddr, lowerAddr, count_upper));
-    // }
-
-    // test mv funcion with Ib = b
-    // double *identity_diag = malloc(count_diag * sizeof(double));
-    // // init identity_diag at all 1
-    // for (int i = 0; i < count_diag; i++) {
-    //     identity_diag[i] = 1.0;
-    // }
-
-    // double *input_vector = malloc(count_diag * sizeof(double));
-    // // init input_vector from 0 to 1999
-    // for (int i = 0; i < count_diag; i++) {
-    //     input_vector[i] = (double)i;
-    // }
-    // print the input vector
-    // printf("\nInput vector:\n");
-    // for (int i = 0; i < count_diag; i++) {
-    //     printf("input_vector[%d] = %f\n", i, input_vector[i]);
-    // }
-
-    // double *out = malloc(count_diag * sizeof(double));
-    // mv_coo(count_diag, 0, identity_diag, NULL, NULL, NULL, input_vector, out);
-
-    // print the result
-    // printf("\nResult of mv_coo with identity matrix:\n");
-    // for (int i = 0; i < count_diag; i++) {
-    //     printf("out[%d] = %f\n", i, out[i]);
-    // }
-
-    // compare the result with the input vector
-    // printf("\nComparing the result with the input vector:\n");
-    // int error_flag=0;
-    // for (int i = 0; i < count_diag; i++) {
-    //     if (out[i] != input_vector[i]) {
-    //         printf("out[%d] = %f, input_vector[%d] = %f\n", i, out[i], i, input_vector[i]);
-    //         error_flag=1;
-    //     }
-    // }
-    // if(error_flag==0){
-    //     printf("All values are equal.\n");
-    // }else{
-    //     printf("Some values are not equal.\n");
-    // }
-
-    // count_upper = (count_diag * count_diag - count_diag) / 2;
-    // printf("count_upper = %d\n", count_upper);
-
-    // // test my function with the matrix with 1/n in every position
-    // double *diag_test = malloc(count_diag * sizeof(double));
-    // double *upper_test = malloc(count_upper * sizeof(double));
-    // int *upperAddr_test = malloc(count_upper * sizeof(int));
-    // int *lowerAddr_test = malloc(count_upper * sizeof(int));
-    // double *input_vector_test = malloc(count_diag * sizeof(double));
-
-    // // init diag with 1/n
-    // double one_over_n = 1.0 / count_diag;
-    // printf("count_diag = %d\n", count_diag);
-    // printf("one_over_n = %f\n", one_over_n);
-
-    // for (int i = 0; i < count_diag; i++)
-    // {
-    //     diag_test[i] = one_over_n;
-    // }
-    // // print the diag
-    // printf("\nDiag:\n");
-    // for (int i = 0; i < count_diag; i++)
-    // {
-    //     printf("diag_test[%d] = %f\n", i, diag_test[i]);
-    // }
-    // // print the sum of the diag
-    // double sum_diag = 0.0;
-    // for (int i = 0; i < count_diag; i++)
-    // {
-    //     sum_diag += diag_test[i];
-    // }
-    // printf("sum_diag = %lf\n", sum_diag);
-
-    // int running_index = 0;
-    // for (int i = 0; i < count_diag - 1; i++)
-    // {
-    //     for (int j = i + 1; j < count_diag; j++)
-    //     {
-    //         upper_test[running_index] = one_over_n;
-    //         upperAddr_test[running_index] = i;
-    //         lowerAddr_test[running_index] = j;
-    //         running_index++;
-    //     }
-    // }
-
-    // init input_vector with all 1
-    // for (int i = 0; i < count_diag; i++)
-    // {
-    //     input_vector_test[i] = 1.0;
-    // }
-    // print the input vector
-    // printf("\nInput vector:\n");
-    // for (int i = 0; i < count_diag; i++) {
-    //     printf("input_vector[%d] = %f\n", i, input_vector_test[i]);
-    // }
-
-    // double *out_test = malloc(count_diag * sizeof(double));
-    // mv_coo(count_diag, count_upper, diag_test, upper_test, upperAddr_test, lowerAddr_test, input_vector_test, out_test);
-    // // print the result
-    // printf("\nResult of mv_coo with 1/n matrix:\n");
-    // for (int i = 0; i < count_diag; i++)
-    // {
-    //     printf("out[%d] = %f\n", i, out_test[i]);
-    // }
-
     // Free allocated memory
     free(diag);
     free(upper);
@@ -433,7 +236,7 @@ int main()
     free(openFoamSolution);
 
     fclose(file);
-    fclose(fileOpenfoam);
+    fclose(fileFoamSolution);
     printf("Files closed successfully.\n");
     printf("End of program.\n");
 
