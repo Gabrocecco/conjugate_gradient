@@ -1,44 +1,6 @@
 #include "vec.h"
+#include "matrix.h"
 #include <math.h>
-
-// this function returns the value of the matrix at (i,j) position
-double get_matrix_entry(int i,
-                        int j,
-                        int n,
-                        double *diag,
-                        double *upper,
-                        int *i_indexes,
-                        int *j_indexes,
-                        int upper_count)
-{
-
-    if (i == j)
-    {                   // diagonal case
-        return diag[i]; // return simply the i-th (or j-th) value of diag
-    }
-
-    // Matrix is symmetric, so A[i][j] == A[j][i]
-    // switch i and j if i > j
-
-    if (i > j)
-    { // if we are in the lower triangle, switch i and j
-        int temp = i;
-        i = j;
-        j = temp;
-    }
-
-    // Search in upper values
-    for (int k = 0; k < upper_count; ++k)
-    { // iterating all non zero upper values and corringponding indexes in i_indexes and j_indexes
-        if (i_indexes[k] == i && j_indexes[k] == j)
-        {                    // if the indexes match with reqeusted (i,j)
-            return upper[k]; // return the value
-        }
-    }
-
-    // If not found the value is zero
-    return 0.0;
-}
 
 // COO matrix-vector multiplication
 void mv_coo(int n,               // matrix size (n x n)

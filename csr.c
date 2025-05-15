@@ -4,43 +4,6 @@
 #include <math.h>
 #include "vec.h"
 
-void generate_sparse_matrix(int m, int n, int nnz, int max_nnz_row, double *values, int *col_index, int *row_ptr) {
-    srand(time(NULL));  // Initialize random seed
-    int inserted = 0;   // Number of non-zero elements inserted
-    row_ptr[0] = 0;     // Start of first row in CSR format
-
-    for (int i = 0; i < m; i++) {
-        // Random number of non-zero elements for this row
-        int nnz_in_row = rand() % (max_nnz_row + 1);
-        
-        // Ensure that we do not insert more than nnz in total
-        if (inserted + nnz_in_row > nnz) {
-            nnz_in_row = nnz - inserted;
-        }
-
-        for (int j = 0; j < nnz_in_row; j++) {
-            // Assign a random value between 1.0 and 10.0
-            values[inserted] = (rand() % 10 + 1) + (rand() / (double)RAND_MAX); 
-            
-            // Random column index (could be optimized for no duplicates per row)
-            col_index[inserted] = rand() % n;
-            
-            inserted++;
-        }
-
-        // Update row pointer to the next position in the CSR format
-        row_ptr[i + 1] = inserted;
-
-        // If all non-zero elements are inserted, mark the remaining rows as having no elements
-        if (inserted >= nnz) {
-            for (int k = i + 1; k < m; k++) {
-                row_ptr[k + 1] = inserted;
-            }
-            break;
-        }
-    }
-}
-
 // define a CSR matrix 
 /*        A              x
     0  0  3  0  0        1
@@ -74,18 +37,38 @@ double get_matrix_entry_csr(int i, int j, int *row_ptr, int *col_index, double *
     return 0.0; // Return 0 if not found
 }
 
-int mv_crs(double *values, int *col_index, int *row_ptr, double *x, double *y, int m, int n)
+// matrix vector multiplication of a m x n matrix in CSR format
+/* 
+   for i = 1, n 
+       y(i)  = 0 
+       for j = row_ptr(i), row_ptr(i+1) - 1
+           y(i) = y(i) + val(j) * x(col_ind(j))
+       end;
+   end;
+*/
+int mv_crs(double *values,  // where the non-zero elements are stored, row by row 
+           int *col_index,  // column index of the non-zero elements
+           int *row_ptr,    // row pointer, where the first element of each row is stored
+           double *x,       // input vector (dimension = n)
+           double *y,       // output vector (dimension = m)
+           int m,           // number of rows of A 
+           int n)           // number of columns of A
 {   
     // for every row i 
-    for(int i = 0; i < m; i++){ // i=1
+    for(int i = 0; i < m; i++){ 
+        printf("row %d:\n", i);
         // take the first and last index of non-zero elements of that row in values[]
-        int first = row_ptr[i]; 
-        int last = row_ptr[i+1] - 1; 
-
-        y[i] = 0.0; // inizializzo y[i] a 0
-        // row i, is stored from row_ptr[i] to row_ptr[i+1]-1
+        int first = row_ptr[i]; // location index in values[] of the first non-zero element of row i
+        int last = row_ptr[i+1] - 1; // location index in values[] of the last non-zero element of row i
+        // print the first and last index
+        printf("Elements of row %d are stored in values[] in positions:\n ", i);
+        printf("first: %d, last: %d\n", first, last);
+        y[i] = 0.0;
+        if(first > last)
+            printf("row %d has 0 non-zero elements, we fix y[%d] = 0.0 \n", i, i);
         for(int j = first; j <= last; j++){ // we iterate from first to last index 
             y[i] += values[j] * x[col_index[j]];    // we multiply the value with the corresponding x value and we accumulate y[i]
+            printf("y[%d] += %f * x[%d] = %f * %f = %f\n", i, values[j], col_index[j], values[j], x[col_index[j]], y[i]);
         }
     }
 
@@ -93,22 +76,50 @@ int mv_crs(double *values, int *col_index, int *row_ptr, double *x, double *y, i
 }
 
 
-int main(){
+// int main(){
+    // define a CSR matrix 
+    /*        A              x
+        0  0  3  0  0        1
+        22 0  0  0  17       2
+        7  0  0  5  0        3 
+        0  8  0  0  0        4
+                            5
+    values = [3, 22, 17, 7, 5, 8]
+    col_index = [2, 0, 4, 0, 3, 1]
+    row_ptr = [0, 1, 3, 5, 6]
+    */
+
     // int m = 4;
     // int n = 5;
     // double values[] = {3.0, 22.0, 17.0, 7.0, 5.0, 8.0};
     // int col_index[] = {2, 0, 4, 0, 3, 1};
     // int row_ptr[] = {0, 1, 3, 5, 6};
-    // double x[n];
+    // double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    // double y[m];
+
+    // define a CSR matrix 
+    /*        A              x
+        0  0  3  0  0        1
+        22 0  0  0  17       2
+        0  0  0  0  0        3 
+        0  8  0  0  0        4
+                             5
+    values =    [3, 22, 17, 8]
+    col_index = [2, 0,  4,  1]
+    row_ptr =   [0, 1,  3,  3, 4]
+    */
+
+    // int m = 4;
+    // int n = 5;
+    // double values[] = {3, 22, 17, 8};
+    // int col_index[] = {2, 0,  4,  1};
+    // int row_ptr[] = {0, 1,  3,  3, 4};
+    // double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
     // double y[m];
 
     // // initialize y to 0
     // for(int i = 0; i < m; i++){
     //     y[i] = 0.0;
-    // }
-    // // initialize x to 0
-    // for(int i = 0; i < n; i++){
-    //     x[i] = (double)i;
     // }
 
     // //print values[]
@@ -128,7 +139,7 @@ int main(){
     // for(int i = 0; i < 5; i++){
     //     printf("%d ", row_ptr[i]);
     // }
-    // printf("\n");
+    // printf("\n\n");
 
     // printf("Matrix A (4x5):\n");
     // for(int i = 0; i < m; i++){
@@ -139,8 +150,8 @@ int main(){
     // }
     
     // // print values of x
-    // printf("x: "); 
-    // for(int i = 0; i < m; i++){
+    // printf("\nx: "); 
+    // for(int i = 0; i < n; i++){
     //     printf("%f ", x[i]);
     // }
     // printf("\n");
@@ -154,6 +165,8 @@ int main(){
     //     printf("%f ", y[i]);
     // }
     // printf("\n");
+
+    // return 0;
 
     /*
     Matrix A (6x6):
@@ -187,43 +200,43 @@ int main(){
     //     printf("\n");
     // }
 
-    int m = 10, n = 10, nnz = 100, max_nnz_row = 10;
+    // int m = 10, n = 10, nnz = 100, max_nnz_row = 10;
     
-    // Arrays to hold values, column indices, and row pointers
-    double values[nnz];
-    int col_index[nnz], row_ptr[m+1];
+    // // Arrays to hold values, column indices, and row pointers
+    // double values[nnz];
+    // int col_index[nnz], row_ptr[m+1];
 
-    // Generate the sparse matrix
-    generate_sparse_matrix(m, n, nnz, max_nnz_row, values, col_index, row_ptr);
+    // // Generate the sparse matrix
+    // generate_sparse_matrix(m, n, nnz, max_nnz_row, values, col_index, row_ptr);
 
-    // Print the CSR format representation of the matrix
-    printf("Row pointers: ");
-    for (int i = 0; i <= m; i++) {
-        printf("%d ", row_ptr[i]);
-    }
-    printf("\n");
+    // // Print the CSR format representation of the matrix
+    // printf("Row pointers: ");
+    // for (int i = 0; i <= m; i++) {
+    //     printf("%d ", row_ptr[i]);
+    // }
+    // printf("\n");
 
-    printf("Column indices: ");
-    for (int i = 0; i < nnz; i++) {
-        printf("%d ", col_index[i]);
-    }
-    printf("\n");
+    // printf("Column indices: ");
+    // for (int i = 0; i < nnz; i++) {
+    //     printf("%d ", col_index[i]);
+    // }
+    // printf("\n");
 
-    printf("Values: ");
-    for (int i = 0; i < nnz; i++) {
-        printf("%f ", values[i]);
-    }
-    printf("\n");
+    // printf("Values: ");
+    // for (int i = 0; i < nnz; i++) {
+    //     printf("%f ", values[i]);
+    // }
+    // printf("\n");
 
-    printf("Matrix A (CSR format):\n");
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%f ", get_matrix_entry_csr(i, j, row_ptr, col_index, values));
-        }
-        printf("\n");
-    }
+    // printf("Matrix A (CSR format):\n");
+    // for (int i = 0; i < m; i++) {
+    //     for (int j = 0; j < n; j++) {
+    //         printf("%f ", get_matrix_entry_csr(i, j, row_ptr, col_index, values));
+    //     }
+    //     printf("\n");
+    // }
 
-    return 0;
+    // return 0;
 
     // // Vettore di input x
     // double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
@@ -240,5 +253,7 @@ int main(){
     //     printf("y[%d] = %.2f\n", i, y[i]);
     // }
 
-    return 0;
-}
+    
+
+//     return 0;
+// }

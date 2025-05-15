@@ -363,7 +363,5 @@ int main(){
     int non_zero_elements_upper = matrix_size * 5; // Number of non-zero elements in the upper triangular part
     test_sparse_symmetric_random_matrix(matrix_size, non_zero_elements_upper);
 
-
-
     return 0;
 }
