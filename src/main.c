@@ -5,7 +5,7 @@
 #include <time.h>
 #include "parser.h"
 #include "vec.h"
-#include "tests.h"
+#include "tests_cg.h"
 #include "cg.h"
 
 /*

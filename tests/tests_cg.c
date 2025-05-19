@@ -5,6 +5,7 @@
 #include "parser.h"
 #include "time.h"
 #include "cg.h"
+#include "coo.h"
 
 // Test CG with a zero matrix
 void test_zero_matrix()

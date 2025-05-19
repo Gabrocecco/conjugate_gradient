@@ -1,27 +1,42 @@
 CC=gcc
-CFLAGS=-std=c99 -Wall -pedantic
+CFLAGS=-std=c99 -Wall -pedantic -Iinclude
 DEBUG_FLAGS=-O0 -g -fsanitize=address
 OPT_FLAGS=-O3 -DNDEBUG -march=native -mtune=native
+
+BUILD_DIR=build
 
 all: debug
 
 run: 
-	./main
+	./$(BUILD_DIR)/main
 
-run_test_matrix:
-	./test_matrix
+# === Debug build ===
+debug: $(BUILD_DIR) src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c
+	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \
+		-o $(BUILD_DIR)/main src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c -lm
 
-debug: main.c tests.c parser.c vec.c cg.c
-	$(CC) $(CFLAGS) -o main main.c parser.c vec.c cg.c -lm $(DEBUG_FLAGS)
+# === Release build ===
+release: $(BUILD_DIR) src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c
+	$(CC) $(CFLAGS) $(OPT_FLAGS) \
+		-o $(BUILD_DIR)/main src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c -lm
 
-release:
-	$(CC) $(CFLAGS) -o main main.c tests.c parser.c vec.c cg.h -lm $(OPT_FLAGS)
-	 
+# === Test executables ===
+test_cg: $(BUILD_DIR) tests/tests_cg.c src/vec.c src/coo.c src/cg.c
+	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \
+		-o $(BUILD_DIR)/test_cg tests/tests_cg.c src/vec.c src/coo.c src/cg.c -lm
+
+test_coo: $(BUILD_DIR) src/coo.c
+	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \
+		-o $(BUILD_DIR)/test_coo src/coo.c -lm
+
+test_csr: $(BUILD_DIR) src/csr.c src/utils.c
+	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \
+		-o $(BUILD_DIR)/test_csr src/csr.c src/utils.c -lm
+
+# === Build directory ===
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+# === Clean ===
 clean:
-	rm -f main
-
-test_cg: tests.c vec.c cg.c 
-	$(CC) $(CFLAGS) -o test tests.c vec.c cg.c -lm $(DEBUG_FLAGS)
-
-test_matrix: matrix.c csr.c 
-	$(CC) $(CFLAGS) -o test_matrix matrix.c csr.c -lm $(DEBUG_FLAGS)
+	rm -rf $(BUILD_DIR)

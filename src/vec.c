@@ -1,40 +1,39 @@
 #include "vec.h"
-#include "matrix.h"
 #include <math.h>
 
 // COO matrix-vector multiplication
-void mv_coo(int n,               // matrix size (n x n)
-            int coo_length,      // number of non-zero elements in the upper triangular part
-            const double *diag,  // diagonal elements (exactly n dense elements)
-            const double *value, // non-zero elements in the upper triangular part
-            const int *rows,     // i indexes of non-zero elements (value)
-            const int *columns,  // j indexes of non-zero elements (value)
-            const double *v,     // input vector
-            double *out)
-{ // output vector
+// void mv_coo(int n,               // matrix size (n x n)
+//             int coo_length,      // number of non-zero elements in the upper triangular part
+//             const double *diag,  // diagonal elements (exactly n dense elements)
+//             const double *value, // non-zero elements in the upper triangular part
+//             const int *rows,     // i indexes of non-zero elements (value)
+//             const int *columns,  // j indexes of non-zero elements (value)
+//             const double *v,     // input vector
+//             double *out)
+// { // output vector
 
-    // init output vector
-    for (int i = 0; i < n; i++)
-    {
-        out[i] = 0.0;
-    }
+//     // init output vector
+//     for (int i = 0; i < n; i++)
+//     {
+//         out[i] = 0.0;
+//     }
 
-    // dense diagonal
-    for (int i = 0; i < n; i++)
-    {
-        out[i] += diag[i] * v[i]; // accumulate the contribution of the diagonal
-    }
+//     // dense diagonal
+//     for (int i = 0; i < n; i++)
+//     {
+//         out[i] += diag[i] * v[i]; // accumulate the contribution of the diagonal
+//     }
 
-    // upper triangular matrix
-    for (int element_index = 0; element_index < coo_length; element_index++)
-    {                                                    // iterate over all non-zero elements in values (top triangular part, by row)
-        const int row_index = rows[element_index];       // i, actual row index of A
-        const int column_index = columns[element_index]; // j, actual column index of A
-        const double val = value[element_index];         // A[i][j]
-        out[row_index] += val * v[column_index];         // out[i] += A[i][j] * v[j]
-        out[column_index] += val * v[row_index];         // out[j] += A[j][i] * v[i]   // symmetric contribution
-    }
-}
+//     // upper triangular matrix
+//     for (int element_index = 0; element_index < coo_length; element_index++)
+//     {                                                    // iterate over all non-zero elements in values (top triangular part, by row)
+//         const int row_index = rows[element_index];       // i, actual row index of A
+//         const int column_index = columns[element_index]; // j, actual column index of A
+//         const double val = value[element_index];         // A[i][j]
+//         out[row_index] += val * v[column_index];         // out[i] += A[i][j] * v[j]
+//         out[column_index] += val * v[row_index];         // out[j] += A[j][i] * v[i]   // symmetric contribution
+//     }
+// }
 
 // out = a - b
 void vec_sub(double *a, double *b, double *out, int n)

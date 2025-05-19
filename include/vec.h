@@ -12,15 +12,15 @@ double get_matrix_entry(int i,
                         int *j_indexes,
                         int upper_count);
 
-// COO matrix-vector multiplication
-void mv_coo(int n,               // matrix size (n x n)
-            int coo_length,      // number of non-zero elements in the upper triangular part
-            const double *diag,  // diagonal elements (exactly n dense elements)
-            const double *value, // non-zero elements in the upper triangular part
-            const int *rows,     // i indexes of non-zero elements (value)
-            const int *columns,  // j indexes of non-zero elements (value)
-            const double *v,     // input vector
-            double *out);        // output vector
+// // COO matrix-vector multiplication
+// void mv_coo(int n,               // matrix size (n x n)
+//             int coo_length,      // number of non-zero elements in the upper triangular part
+//             const double *diag,  // diagonal elements (exactly n dense elements)
+//             const double *value, // non-zero elements in the upper triangular part
+//             const int *rows,     // i indexes of non-zero elements (value)
+//             const int *columns,  // j indexes of non-zero elements (value)
+//             const double *v,     // input vector
+//             double *out);        // output vector
 
 // Vector subtraction: out = a - b
 void vec_sub(double *a, double *b, double *out, int n);

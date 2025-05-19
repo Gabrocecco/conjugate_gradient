@@ -4,6 +4,8 @@
 #include <time.h>
 #include "vec.h"
 #include "cg.h"
+#include "coo.h"
+#include "csr.h"
 
 /*
     source          2000 ( 0.000000 0.000000 0.000000 0.000000 ...);
@@ -39,7 +41,7 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
     }
 
     // Initialize the residual vector r_0 := b - A x_0
-    mv_coo(n, coo_length, diag, upper, rows, cols, x, r); // A x_0
+    mv_coo_symmetric(n, coo_length, diag, upper, rows, cols, x, r); // A x_0
     vec_sub(b, r, r, n);                                  // r_0 = b - A x_0
 
     // printf("Initial residual norm: %.5e\n", sqrt(vec_dot(r, r, n))); // Print the initial residual norm
@@ -53,7 +55,7 @@ int conjugate_gradient(const int n,    // matrix size (n x n)
 
     for (int iter = 0; iter < max_iter; iter++)
     {
-        mv_coo(n, coo_length, diag, upper, rows, cols, p, Ap); // Compute: A p_k
+        mv_coo_symmetric(n, coo_length, diag, upper, rows, cols, p, Ap); // Compute: A p_k
         double alpha = r_dot_r_old / vec_dot(p, Ap, n);        // alpha = (r^T * r) / (p^T * A * p)
 
         vec_axpy(x, p, alpha, x, n); // x_{k+1} = x_k + alpha * p_k
