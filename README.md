@@ -1,4 +1,4 @@
-# Conjugate Gradient Solver
+# Conjugate Gradient Solver for sparse symmetric matrices 
 
 ```text
 conjugate_gradient/
@@ -12,3 +12,12 @@ conjugate_gradient/
 ├── data/           # OpenFoam i/o files 
 ├── Makefile        
 └── README.md       
+
+Supported matrix formats: 
+
+- [x] COO
+- [] CSR
+- [] ELL 
+- [] SELL
+
+

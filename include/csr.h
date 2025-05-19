@@ -1,6 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void print_dense_symmetric_matrix_from_csr(int n,
+    double *diag,
+    double *upper,
+    int *col_index,
+    int *row_ptr);
+
 double get_matrix_entry_symmetric_csr(int i, int j, int n,
                                       double *diag,
                                       double *upper,
@@ -24,8 +30,16 @@ int coo_to_csr(int triangular_dim,
                int *coo_col_indx,
                int *csr_row_ptr);
 
+void mv_csr_symmetric(int n,                // dimensione matrice (n x n)
+                      const double *diag,   // n valori sulla diagonale
+                      const double *upper,  // valori non nulli triangolare superiore
+                      const int *col_index, // colonne degli upper[]
+                      const int *row_ptr,   // inizio riga in upper[] e col_index[]
+                      const double *v,      // vettore di input
+                      double *out);          // vettore di output
+
 int generate_sparse_symmetric_csr(int n, double density,
-                                  double **diag,
-                                  double **upper,
-                                  int **col_index,
-                                  int **row_ptr);
+                                      double **diag,
+                                      double **upper,
+                                      int **col_index,
+                                      int **row_ptr);

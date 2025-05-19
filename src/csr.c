@@ -42,10 +42,10 @@ double get_generic_matrix_entry_csr(int i, int j, int nrows, int *row_ptr, int *
 }
 
 double get_matrix_entry_symmetric_csr(int i, int j, int n,
-                               double *diag,
-                               double *upper,
-                               int *col_index,
-                               int *row_ptr)
+                                      double *diag,
+                                      double *upper,
+                                      int *col_index,
+                                      int *row_ptr)
 {
     if (i < 0 || j < 0 || i >= n || j >= n)
     {
@@ -77,6 +77,23 @@ double get_matrix_entry_symmetric_csr(int i, int j, int n,
     }
 
     return 0.0; // implicit value zero
+}
+
+void print_dense_symmetric_matrix_from_csr(int n,
+                                           double *diag,
+                                           double *upper,
+                                           int *col_index,
+                                           int *row_ptr)
+{
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            double value = get_matrix_entry_symmetric_csr(i, j, n, diag, upper, col_index, row_ptr);
+            printf("%6.1f ", value);
+        }
+        printf("\n");
+    }
 }
 
 // Generate a sparse symmetric matrix with dense diag with a parameter density
@@ -139,12 +156,12 @@ int generate_sparse_symmetric_csr(int n, double density,
    end;
 */
 int mv_crs_generic(double *values, // where the non-zero elements are stored, row by row
-           int *col_index, // column index of the non-zero elements
-           int *row_ptr,   // row pointer, where the first element of each row is stored
-           double *x,      // input vector (dimension = n)
-           double *y,      // output vector (dimension = m)
-           int m,          // number of rows of A
-           int n)          // number of columns of A
+                   int *col_index, // column index of the non-zero elements
+                   int *row_ptr,   // row pointer, where the first element of each row is stored
+                   double *x,      // input vector (dimension = n)
+                   double *y,      // output vector (dimension = m)
+                   int m,          // number of rows of A
+                   int n)          // number of columns of A
 {
     // for every row i
     for (int i = 0; i < m; i++)
@@ -169,39 +186,42 @@ int mv_crs_generic(double *values, // where the non-zero elements are stored, ro
     return 0;
 }
 
-void mv_csr_symmetric(int n,                  // dimensione matrice (n x n)
-                      const double *diag,     // n valori sulla diagonale
-                      const double *upper,    // valori non nulli triangolare superiore
-                      const int *col_index,   // colonne degli upper[]
-                      const int *row_ptr,     // inizio riga in upper[] e col_index[]
-                      const double *v,        // vettore di input
-                      double *out)            // vettore di output
+void mv_csr_symmetric(int n,                // dimensione matrice (n x n)
+                      const double *diag,   // n valori sulla diagonale
+                      const double *upper,  // valori non nulli triangolare superiore
+                      const int *col_index, // colonne degli upper[]
+                      const int *row_ptr,   // inizio riga in upper[] e col_index[]
+                      const double *v,      // vettore di input
+                      double *out)          // vettore di output
 {
     // Inizializza il vettore di output a 0
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++)
+    {
         out[i] = 0.0;
     }
 
     // Contributo della diagonale
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++)
+    {
         out[i] += diag[i] * v[i];
     }
 
     // Contributo della triangolare superiore
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++)
+    {
         int start = row_ptr[i];
         int end = row_ptr[i + 1];
 
-        for (int k = start; k < end; k++) {
-            int j = col_index[k];    // colonna del valore non nullo A[i][j]
+        for (int k = start; k < end; k++)
+        {
+            int j = col_index[k]; // colonna del valore non nullo A[i][j]
             double a_ij = upper[k];
 
-            out[i] += a_ij * v[j];   // contributo diretto
-            out[j] += a_ij * v[i];   // contributo simmetrico
+            out[i] += a_ij * v[j]; // contributo diretto
+            out[j] += a_ij * v[i]; // contributo simmetrico
         }
     }
 }
-
 
 int coo_to_csr(int triangular_dim,
                int upper_count,
@@ -280,221 +300,220 @@ int coo_to_csr(int triangular_dim,
 
 //     mv_csr_symmetric(n, diag, upper, col_index, row_ptr, v, out);
 //     print_double_vector(out, n);
-    
 
 //     free(diag);
 //     free(upper);
 //     free(col_index);
 //     free(row_ptr);
 
-    // return 0;
+// return 0;
 
-    // CSR format
-    /*        A
-        2  3  0  0
-        0  0  17 2
-        0  0  0  0
-        0  0  0  1
-    */
-    // double values[] = {2, 3, 17, 2, 1};
-    // int row_index[] = {0, 0, 1, 1, 3};
-    // int col_index[] = {0, 1, 2, 3, 3};
-    // int triag_dim = 4;
-    // int upper_count = 5;
-    // int csr_row_ptr[triag_dim + 1];
-    // coo_to_csr(triag_dim, upper_count, values, row_index, col_index, csr_row_ptr);
+// CSR format
+/*        A
+    2  3  0  0
+    0  0  17 2
+    0  0  0  0
+    0  0  0  1
+*/
+// double values[] = {2, 3, 17, 2, 1};
+// int row_index[] = {0, 0, 1, 1, 3};
+// int col_index[] = {0, 1, 2, 3, 3};
+// int triag_dim = 4;
+// int upper_count = 5;
+// int csr_row_ptr[triag_dim + 1];
+// coo_to_csr(triag_dim, upper_count, values, row_index, col_index, csr_row_ptr);
 
-    // // test upper_coo_to_csr
-    // // double values[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0};
-    // // int col_index[] = {1, 3, 5, 2, 4, 5, 3, 5, 6, 6};
-    // // int row_index[] = {0, 0, 0, 1, 2, 2, 3, 4, 5, 6};
-    // // int triag_dim = 7;              // dimension of the upper triangular matrix
-    // // int upper_count = 10;           // number of non-zero elements in the upper triangular part
-    // // int csr_row_ptr[triag_dim + 1]; // row pointer, where the first element of each row is stored
+// // test upper_coo_to_csr
+// // double values[] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0};
+// // int col_index[] = {1, 3, 5, 2, 4, 5, 3, 5, 6, 6};
+// // int row_index[] = {0, 0, 0, 1, 2, 2, 3, 4, 5, 6};
+// // int triag_dim = 7;              // dimension of the upper triangular matrix
+// // int upper_count = 10;           // number of non-zero elements in the upper triangular part
+// // int csr_row_ptr[triag_dim + 1]; // row pointer, where the first element of each row is stored
 
-    // // free(csr_row_ptr);
-    // printf("CSR row pointer:\n");
-    // for (int i = 0; i < triag_dim + 1; i++)
-    // {
-    //     printf("%d ", csr_row_ptr[i]);
-    // }
-    // printf("\n");
+// // free(csr_row_ptr);
+// printf("CSR row pointer:\n");
+// for (int i = 0; i < triag_dim + 1; i++)
+// {
+//     printf("%d ", csr_row_ptr[i]);
+// }
+// printf("\n");
 
-    // define a CSR matrix
-    /*        A              x
-        0  0  3  0  0        1
-        22 0  0  0  17       2
-        7  0  0  5  0        3
-        0  8  0  0  0        4
-                            5
-    values = [3, 22, 17, 7, 5, 8]
-    col_index = [2, 0, 4, 0, 3, 1]
-    row_ptr = [0, 1, 3, 5, 6]
-    */
+// define a CSR matrix
+/*        A              x
+    0  0  3  0  0        1
+    22 0  0  0  17       2
+    7  0  0  5  0        3
+    0  8  0  0  0        4
+                        5
+values = [3, 22, 17, 7, 5, 8]
+col_index = [2, 0, 4, 0, 3, 1]
+row_ptr = [0, 1, 3, 5, 6]
+*/
 
-    // int m = 4;
-    // int n = 5;
-    // double values[] = {3.0, 22.0, 17.0, 7.0, 5.0, 8.0};
-    // int col_index[] = {2, 0, 4, 0, 3, 1};
-    // int row_ptr[] = {0, 1, 3, 5, 6};
-    // double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
-    // double y[m];
+// int m = 4;
+// int n = 5;
+// double values[] = {3.0, 22.0, 17.0, 7.0, 5.0, 8.0};
+// int col_index[] = {2, 0, 4, 0, 3, 1};
+// int row_ptr[] = {0, 1, 3, 5, 6};
+// double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+// double y[m];
 
-    // define a CSR matrix
-    /*        A              x
-        0  0  3  0  0        1
-        22 0  0  0  17       2
-        0  0  0  0  0        3
-        0  8  0  0  0        4
-                             5
-    values =    [3, 22, 17, 8]
-    col_index = [2, 0,  4,  1]
-    row_ptr =   [0, 1,  3,  3, 4]
-    */
+// define a CSR matrix
+/*        A              x
+    0  0  3  0  0        1
+    22 0  0  0  17       2
+    0  0  0  0  0        3
+    0  8  0  0  0        4
+                         5
+values =    [3, 22, 17, 8]
+col_index = [2, 0,  4,  1]
+row_ptr =   [0, 1,  3,  3, 4]
+*/
 
-    // int m = 4;
-    // int n = 5;
-    // int nnz = 4;
-    // double values[] = {3, 22, 17, 8};
-    // int col_index[] = {2, 0,  4,  1};
-    // int row_ptr[] = {0, 1,  3,  3, 4};
-    // double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
-    // double y[m];
+// int m = 4;
+// int n = 5;
+// int nnz = 4;
+// double values[] = {3, 22, 17, 8};
+// int col_index[] = {2, 0,  4,  1};
+// int row_ptr[] = {0, 1,  3,  3, 4};
+// double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+// double y[m];
 
-    // // initialize y to 0
-    // for(int i = 0; i < m; i++){
-    //     y[i] = 0.0;
-    // }
+// // initialize y to 0
+// for(int i = 0; i < m; i++){
+//     y[i] = 0.0;
+// }
 
-    // //print values[]
-    // printf("values: ");
-    // for(int i = 0; i < nnz; i++){
-    //     printf("%f ", values[i]);
-    // }
-    // printf("\n");
-    // // print col_index[]
-    // printf("col_index: ");
-    // for(int i = 0; i < nnz; i++){
-    //     printf("%d ", col_index[i]);
-    // }
-    // printf("\n");
-    // // print row_ptr[]
-    // printf("row_ptr: ");
-    // for(int i = 0; i < m + 1; i++){
-    //     printf("%d ", row_ptr[i]);
-    // }
-    // printf("\n\n");
+// //print values[]
+// printf("values: ");
+// for(int i = 0; i < nnz; i++){
+//     printf("%f ", values[i]);
+// }
+// printf("\n");
+// // print col_index[]
+// printf("col_index: ");
+// for(int i = 0; i < nnz; i++){
+//     printf("%d ", col_index[i]);
+// }
+// printf("\n");
+// // print row_ptr[]
+// printf("row_ptr: ");
+// for(int i = 0; i < m + 1; i++){
+//     printf("%d ", row_ptr[i]);
+// }
+// printf("\n\n");
 
-    // printf("Matrix A (4x5):\n");
-    // for(int i = 0; i < m; i++){
-    //     for(int j = 0; j < n; j++){
-    //         printf("%f ", get_generic_matrix_entry_csr(i, j, m, row_ptr, col_index, values));
-    //     }
-    //     printf("\n");
-    // }
+// printf("Matrix A (4x5):\n");
+// for(int i = 0; i < m; i++){
+//     for(int j = 0; j < n; j++){
+//         printf("%f ", get_generic_matrix_entry_csr(i, j, m, row_ptr, col_index, values));
+//     }
+//     printf("\n");
+// }
 
-    // // print values of x
-    // printf("\nx: ");
-    // for(int i = 0; i < n; i++){
-    //     printf("%f ", x[i]);
-    // }
-    // printf("\n");
+// // print values of x
+// printf("\nx: ");
+// for(int i = 0; i < n; i++){
+//     printf("%f ", x[i]);
+// }
+// printf("\n");
 
-    // // call the function
-    // mv_crs(values, col_index, row_ptr, x, y, m, n);
-    // // print the result
-    // printf("y: ");
-    // for(int i = 0; i < m; i++){
-    //     printf("%f ", y[i]);
-    // }
-    // printf("\n");
+// // call the function
+// mv_crs(values, col_index, row_ptr, x, y, m, n);
+// // print the result
+// printf("y: ");
+// for(int i = 0; i < m; i++){
+//     printf("%f ", y[i]);
+// }
+// printf("\n");
 
-    // return 0;
+// return 0;
 
-    /*
-    Matrix A (6x6):
-    0 0 0 0 0 9
-    5 0 0 0 0 0
-    0 0 2 0 0 0
-    0 3 0 0 0 0
-    0 0 0 0 7 0
-    0 0 0 4 0 0
-    */
+/*
+Matrix A (6x6):
+0 0 0 0 0 9
+5 0 0 0 0 0
+0 0 2 0 0 0
+0 3 0 0 0 0
+0 0 0 0 7 0
+0 0 0 4 0 0
+*/
 
-    // double values[] = {9.0, 5.0, 2.0, 3.0, 7.0, 4.0};
-    // int col_index[] = {5, 0, 2, 1, 4, 3};
-    // int row_ptr[] = {0, 1, 2, 3, 4, 5, 6};  // lunghezza = n_righe + 1 = 7
-    // double x[6] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
-    // double y[6];
+// double values[] = {9.0, 5.0, 2.0, 3.0, 7.0, 4.0};
+// int col_index[] = {5, 0, 2, 1, 4, 3};
+// int row_ptr[] = {0, 1, 2, 3, 4, 5, 6};  // lunghezza = n_righe + 1 = 7
+// double x[6] = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
+// double y[6];
 
-    // mv_crs(values, col_index, row_ptr, x, y, 6, 6);
-    // // print the result
-    // printf("y: ");
-    // for(int i = 0; i < 6; i++){
-    //     printf("%f ", y[i]);
-    // }
-    // printf("\n");
+// mv_crs(values, col_index, row_ptr, x, y, 6, 6);
+// // print the result
+// printf("y: ");
+// for(int i = 0; i < 6; i++){
+//     printf("%f ", y[i]);
+// }
+// printf("\n");
 
-    // printf("Matrix A (6x6):\n");
-    // for(int i = 0; i < 6; i++){
-    //     for(int j = 0; j < 6; j++){
-    //         printf("%f ", get_matrix_entry_csr(i, j, row_ptr, col_index, values));
-    //     }
-    //     printf("\n");
-    // }
+// printf("Matrix A (6x6):\n");
+// for(int i = 0; i < 6; i++){
+//     for(int j = 0; j < 6; j++){
+//         printf("%f ", get_matrix_entry_csr(i, j, row_ptr, col_index, values));
+//     }
+//     printf("\n");
+// }
 
-    // int m = 10, n = 10, nnz = 100, max_nnz_row = 10;
+// int m = 10, n = 10, nnz = 100, max_nnz_row = 10;
 
-    // // Arrays to hold values, column indices, and row pointers
-    // double values[nnz];
-    // int col_index[nnz], row_ptr[m+1];
+// // Arrays to hold values, column indices, and row pointers
+// double values[nnz];
+// int col_index[nnz], row_ptr[m+1];
 
-    // // Generate the sparse matrix
-    // generate_sparse_matrix(m, n, nnz, max_nnz_row, values, col_index, row_ptr);
+// // Generate the sparse matrix
+// generate_sparse_matrix(m, n, nnz, max_nnz_row, values, col_index, row_ptr);
 
-    // // Print the CSR format representation of the matrix
-    // printf("Row pointers: ");
-    // for (int i = 0; i <= m; i++) {
-    //     printf("%d ", row_ptr[i]);
-    // }
-    // printf("\n");
+// // Print the CSR format representation of the matrix
+// printf("Row pointers: ");
+// for (int i = 0; i <= m; i++) {
+//     printf("%d ", row_ptr[i]);
+// }
+// printf("\n");
 
-    // printf("Column indices: ");
-    // for (int i = 0; i < nnz; i++) {
-    //     printf("%d ", col_index[i]);
-    // }
-    // printf("\n");
+// printf("Column indices: ");
+// for (int i = 0; i < nnz; i++) {
+//     printf("%d ", col_index[i]);
+// }
+// printf("\n");
 
-    // printf("Values: ");
-    // for (int i = 0; i < nnz; i++) {
-    //     printf("%f ", values[i]);
-    // }
-    // printf("\n");
+// printf("Values: ");
+// for (int i = 0; i < nnz; i++) {
+//     printf("%f ", values[i]);
+// }
+// printf("\n");
 
-    // printf("Matrix A (CSR format):\n");
-    // for (int i = 0; i < m; i++) {
-    //     for (int j = 0; j < n; j++) {
-    //         printf("%f ", get_matrix_entry_csr(i, j, row_ptr, col_index, values));
-    //     }
-    //     printf("\n");
-    // }
+// printf("Matrix A (CSR format):\n");
+// for (int i = 0; i < m; i++) {
+//     for (int j = 0; j < n; j++) {
+//         printf("%f ", get_matrix_entry_csr(i, j, row_ptr, col_index, values));
+//     }
+//     printf("\n");
+// }
 
-    // return 0;
+// return 0;
 
-    // // Vettore di input x
-    // double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+// // Vettore di input x
+// double x[] = {1.0, 2.0, 3.0, 4.0, 5.0};
 
-    // // Vettore di output y
-    // double y[m];
+// // Vettore di output y
+// double y[m];
 
-    // // Calcola il prodotto matrice-vettore
-    // mv_crs(values, col_index, row_ptr, x, y, m, n);
+// // Calcola il prodotto matrice-vettore
+// mv_crs(values, col_index, row_ptr, x, y, m, n);
 
-    // // Stampa il risultato
-    // printf("Risultato del prodotto matrice-vettore:\n");
-    // for (int i = 0; i < m; i++) {
-    //     printf("y[%d] = %.2f\n", i, y[i]);
-    // }
+// // Stampa il risultato
+// printf("Risultato del prodotto matrice-vettore:\n");
+// for (int i = 0; i < m; i++) {
+//     printf("y[%d] = %.2f\n", i, y[i]);
+// }
 
 //     return 0;
 // }

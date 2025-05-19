@@ -3,6 +3,20 @@
 #include "coo.h"
 #include "csr.h"
 
+// takes
+void print_dense_symmeric_matrix_from_coo(int n, double *diag, double *upper, int *row_inx, int *col_inx, int upper_count)
+{
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            double value = get_matrix_entry_symmetric_coo(i, j, n, diag, upper, row_inx, col_inx, upper_count);
+            printf("%f ", value);
+        }
+        printf("\n");
+    }
+}
+
 // this function returns the value of the matrix at (i,j) position
 double get_matrix_entry_symmetric_coo(int i,
                                       int j,

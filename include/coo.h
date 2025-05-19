@@ -21,3 +21,5 @@ void mv_coo_symmetric(int n,               // matrix size (n x n)
             const int *columns,  // j indexes of non-zero elements (value)
             const double *v,     // input vector
             double *out);
+
+void print_dense_symmeric_matrix_from_coo(int n, double *diag, double *upper, int *row_inx, int *col_inx, int upper_count);
