@@ -50,8 +50,8 @@ void test_get_matrix_entry_symmetric_csr()
     int col_index[] = {1, 2, 3};
     int row_ptr[] = {0, 1, 2, 3, 3}; 
 
-    printf("Dense matrix: \n");
-    print_dense_symmetric_matrix_from_csr(n, diag, upper, col_index, row_ptr);
+    // printf("Dense matrix: \n");
+    // print_dense_symmetric_matrix_from_csr(n, diag, upper, col_index, row_ptr);
 
     // Diagonale
     assert(get_matrix_entry_symmetric_csr(0, 0, n, diag, upper, col_index, row_ptr) == 10);

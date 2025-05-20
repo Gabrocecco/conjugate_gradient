@@ -7,6 +7,9 @@
 #include "vec.h"
 #include "tests_cg.h"
 #include "cg.h"
+#include "csr.h"
+#include "utils.h"
+#include "coo.h"
 
 /*
     Compile:
@@ -26,7 +29,8 @@ int main()
 {
     printf("Start of program.\n");
     printf("-------------------------------------------------------------------\n");
-    printf("Loading data from file...\n");
+
+    printf("Loading input data system from file...\n");
     const char *filename = "data/data.txt";  // linear system data input (COO) filename 
     FILE *file = fopen(filename, "r");
     if (!file)
@@ -39,6 +43,7 @@ int main()
         printf("File %s opened successfully.\n", filename);
     }
 
+    printf("Loading solution from OpenFoam for validation...\n");
     const char *filenameFoamSolution = "data/Phi";   // solution of the linear system from OpenFoam filename 
     FILE *fileFoamSolution = fopen(filenameFoamSolution, "r");
     if (!filenameFoamSolution)
@@ -108,6 +113,11 @@ int main()
         for (int i = count_upper - 5; i < count_upper; i++)
             printf("upper[%d] = %f\n", i, upper[i]);
         printf(")\n");
+
+        // printf("\nupper( \n");
+        // for (int i = 0; i < count_upper; i++)
+        //     printf("%f ", upper[i]);
+        // printf("...\n");
     }
 
     if (upperAddr)
@@ -158,7 +168,7 @@ int main()
         // Time the conjugate gradient method
         // Start the timer
         clock_t start = clock();
-        int iterations = conjugate_gradient(
+        int iterations = conjugate_gradient_coo(
             count_diag,  // matrix size (n x n)
             diag,        // diagonal elements (exactly n dense elements)
             count_upper, // number of non-zero elements in the upper triangular part
@@ -217,6 +227,86 @@ int main()
     printf("-------------------------------------------------------------------\n");
     printf("-------------------------------------------------------------------\n");
 
+    printf("CSR test\n\n\n");
+
+    int *csr_row_ptr = (int *)malloc((count_diag + 1) * sizeof(int));
+    coo_to_csr(count_diag, count_upper, upper, upperAddr, lowerAddr, csr_row_ptr);
+    // print_dense_symmetric_matrix_from_csr(count_diag, diag, upper, lowerAddr, csr_row_ptr);
+    // compare_symmetric_matrices_coo_csr(count_diag, diag, upper, upperAddr, lowerAddr, count_upper, diag, upper, lowerAddr, csr_row_ptr);
+    printf("Conversion from COO to CSR done \n csr_row_ptr[] = ");
+    print_integer_vector(csr_row_ptr, count_diag + 1);
+
+    printf("-------------------------------------------------------------------\n\n");
+    for (int i = 0; i < n_tests; i++)
+    {
+        printf("Begin test number %d\n\n", i + 1);
+        // initialize the output vector
+        double *y = (double *)malloc(count_diag * sizeof(double));
+
+        // Time the conjugate gradient method
+        // Start the timer
+        clock_t start = clock();
+        int iterations = conjugate_gradient_csr(
+            count_diag,
+            diag,
+            count_upper,
+            upper,
+            csr_row_ptr,
+            lowerAddr,
+            source,
+            y,
+            1000,
+            1e-6);
+        // Stop the timer
+        clock_t end = clock();
+        double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+        time_spent_acc += time_spent;
+        double diff = 0;
+        double max_component_diff = max_difference(y, openFoamSolution, count_diag);
+        printf("Time spent: %f seconds\n", time_spent);
+        if (iterations >= 0)
+        {
+            printf("Converged in %d iterations.\n\n", iterations);
+            // print some values of x
+            for (int i = 0; i < 5 && i < count_diag; i++)
+            {
+                diff = y[i] - openFoamSolution[i];
+                printf("x[%d] = %.10f | OpenFoam: x[%d] = %.10f | difference: %f | %.3f%%\n", i, y[i], i, openFoamSolution[i], diff, diff * 100);
+            }
+            printf("...\n");
+            // Print the last few values
+            for (int i = count_diag - 5; i < count_diag; i++)
+            {
+                diff = y[i] - openFoamSolution[i];
+                printf("x[%d] = %.10f | OpenFoam: x[%d] = %.10f | difference: %f | %.3f%%\n", i, y[i], i, openFoamSolution[i], diff, diff * 100);
+            }
+            printf(")\n");
+
+            // Check the result against the OpenFOAM solution
+            double rmse_value = rmse(y, openFoamSolution, count_diag);
+            double euclidean_distance_value = euclidean_distance(y, openFoamSolution, count_diag);
+            printf("RMSE: %f\n", rmse_value);
+            printf("Euclidean distance: %f\n", euclidean_distance_value);
+            printf("Max component difference: %f\n", max_component_diff);
+        }
+        else
+        {
+            printf("Didnt reach convergences init max_iter.\n");
+        }
+
+        free(y);
+        printf("End of test number %d\n", i + 1);
+        printf("-------------------------------------------------------------------\n\n");
+    }
+    printf("\n-------------------------------------------------------------------\n");
+    printf("-------------------------------------------------------------------\n");
+    printf("SUMMARY of %d runs: \n", n_tests);
+    printf("Average time spent in %d runs: %f seconds\n", n_tests, time_spent_acc / n_tests);
+    printf("-------------------------------------------------------------------\n");
+    printf("-------------------------------------------------------------------\n");
+    
+
+
     // Free allocated memory
     free(diag);
     free(upper);
@@ -224,7 +314,9 @@ int main()
     free(lowerAddr);
     free(source);
     free(openFoamSolution);
+    free(csr_row_ptr);
 
+    
     fclose(file);
     fclose(fileFoamSolution);
     printf("Files closed successfully.\n");

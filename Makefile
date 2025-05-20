@@ -11,23 +11,23 @@ run:
 	./$(BUILD_DIR)/main
 
 # === Debug build ===
-debug: $(BUILD_DIR) src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c
+debug: $(BUILD_DIR) src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c src/utils.c 
 	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \
-		-o $(BUILD_DIR)/main src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c -lm
+		-o $(BUILD_DIR)/main src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c src/utils.c -lm
 
 # === Release build ===
-release: $(BUILD_DIR) src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c
+release: $(BUILD_DIR) src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c src/utils.c 
 	$(CC) $(CFLAGS) $(OPT_FLAGS) \
-		-o $(BUILD_DIR)/main src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c -lm
+		-o $(BUILD_DIR)/main src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c src/utils.c  -lm
 
 # === Test executables ===
 test_cg: $(BUILD_DIR) tests/tests_cg.c src/vec.c src/coo.c src/cg.c
 	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \
 		-o $(BUILD_DIR)/test_cg tests/tests_cg.c src/vec.c src/coo.c src/cg.c -lm
 
-test_coo: $(BUILD_DIR) src/coo.c tests/test_coo.c src/utils.c
+test_coo: $(BUILD_DIR) src/coo.c src/csr.c tests/test_coo.c src/utils.c
 	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \
-		-o $(BUILD_DIR)/test_coo src/coo.c src/utils.c tests/test_coo.c  -lm
+		-o $(BUILD_DIR)/test_coo src/coo.c src/csr.c src/utils.c tests/test_coo.c  -lm
 
 test_csr: $(BUILD_DIR) src/csr.c tests/test_csr.c src/utils.c
 	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \

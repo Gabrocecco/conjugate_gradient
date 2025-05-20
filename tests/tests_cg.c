@@ -352,6 +352,10 @@ void test_sparse_symmetric_random_matrix(int matrix_size, int non_zero_elements_
     printf("--- End of Test: Sparse Symmetric Random Matrix ---\n");
 }
 
+void test_cg_csr(){
+    
+}
+
 
 int main(){
 

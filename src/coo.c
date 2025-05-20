@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "coo.h"
 #include "csr.h"
+#include <math.h>
 
 // takes
 void print_dense_symmeric_matrix_from_coo(int n, double *diag, double *upper, int *row_inx, int *col_inx, int upper_count)
@@ -134,16 +135,23 @@ int generate_sparse_generic_matrix_coo(int n, double density, double **values, i
 
     return nnz_count; // Return the number of non-zero elements
 }
+// void mv_csr_symmetric(int n,                // matrix dimension (n x n)
+//                       const double *diag,   // diagonal (n dense values )
+//                       const double *upper,  // upper non zero values, per row
+//                       const int *col_index, // columns index for upper values
+//                       const int *row_ptr,   // starting index in values for every row
+//                       const double *v,      // input vector
+//                       double *out)          // output vector
 
 // COO symmetric matrix-vector multiplication
 void mv_coo_symmetric(int n,               // matrix size (n x n)
-            int coo_length,      // number of non-zero elements in the upper triangular part
-            const double *diag,  // diagonal elements (exactly n dense elements)
-            const double *value, // non-zero elements in the upper triangular part
-            const int *rows,     // i indexes of non-zero elements (value)
-            const int *columns,  // j indexes of non-zero elements (value)
-            const double *v,     // input vector
-            double *out)
+                      int coo_length,      // number of non-zero elements in the upper triangular part
+                      const double *diag,  // diagonal elements (exactly n dense elements)
+                      const double *value, // non-zero elements in the upper triangular part
+                      const int *rows,     // i indexes of non-zero elements (value)
+                      const int *columns,  // j indexes of non-zero elements (value)
+                      const double *v,     // input vector
+                      double *out)
 { // output vector
 
     // init output vector
@@ -167,6 +175,47 @@ void mv_coo_symmetric(int n,               // matrix size (n x n)
         out[row_index] += val * v[column_index];         // out[i] += A[i][j] * v[j]
         out[column_index] += val * v[row_index];         // out[j] += A[j][i] * v[i]   // symmetric contribution
     }
+}
+
+int compare_symmetric_matrices_coo_csr(int n,
+                                        double *diag_coo,
+                                        double *upper_coo,
+                                        int *i_idx,
+                                        int *j_idx,
+                                        int upper_count,
+                                        double *diag_csr,
+                                        double *upper_csr,
+                                        int *col_index,
+                                        int *row_ptr)
+{
+    const double TOL = 1e-6;
+    int success = 1;
+
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            double a = get_matrix_entry_symmetric_coo(i, j, n, diag_coo, upper_coo, i_idx, j_idx, upper_count);
+            double b = get_matrix_entry_symmetric_csr(i, j, n, diag_csr, upper_csr, col_index, row_ptr);
+            double diff = fabs(a - b);
+            if (diff > TOL)
+            {
+                printf("Mismatch at (%d, %d): COO = %.12f, CSR = %.12f, diff = %.3e\n", i, j, a, b, diff);
+                success = -1;
+            }
+        }
+    }
+
+    if (success)
+    {
+        printf("Matrix comparison passed: COO == CSR within tolerance %.1e\n", TOL);
+    }
+    else
+    {
+        printf("Matrix comparison FAILED.\n");
+    }
+
+    return success;
 }
 
 // Convert COO format to CSR format
@@ -248,102 +297,102 @@ row_ptr =   [0, 1,  3,  3, 4]
 
 // int main()
 // {
-    // double *diag, *upper;
-    // int *upperAddr, *lowerAddr;
-    // int n = 10;           // Matrix size
-    // double density = 0.2; // Density of the matrix
+// double *diag, *upper;
+// int *upperAddr, *lowerAddr;
+// int n = 10;           // Matrix size
+// double density = 0.2; // Density of the matrix
 
-    // // Generate a sparse symmetric matrix of dimension n with a density
-    // int upper_count = generate_sparse_symmetric_matrix_full_diag_coo(n, density, &diag, &upper, &upperAddr, &lowerAddr);
+// // Generate a sparse symmetric matrix of dimension n with a density
+// int upper_count = generate_sparse_symmetric_matrix_full_diag_coo(n, density, &diag, &upper, &upperAddr, &lowerAddr);
 
-    // // Print the generated matrix
-    // printf("Diagonal: ");
-    // for (int i = 0; i < n; i++)
-    // {
-    //     printf("%f ", diag[i]);
-    // }
-    // printf("\n");
+// // Print the generated matrix
+// printf("Diagonal: ");
+// for (int i = 0; i < n; i++)
+// {
+//     printf("%f ", diag[i]);
+// }
+// printf("\n");
 
-    // printf("Upper: ");
-    // for (int i = 0; i < upper_count; i++)
-    // {
-    //     printf("%f ", upper[i]);
-    // }
-    // printf("\n");
+// printf("Upper: ");
+// for (int i = 0; i < upper_count; i++)
+// {
+//     printf("%f ", upper[i]);
+// }
+// printf("\n");
 
-    // printf("UpperAddr: ");
-    // for (int i = 0; i < upper_count; i++)
-    // {
-    //     printf("%d ", upperAddr[i]);
-    // }
-    // printf("\n");
+// printf("UpperAddr: ");
+// for (int i = 0; i < upper_count; i++)
+// {
+//     printf("%d ", upperAddr[i]);
+// }
+// printf("\n");
 
-    // printf("LowerAddr: ");
-    // for (int i = 0; i < upper_count; i++)
-    // {
-    //     printf("%d ", lowerAddr[i]);
-    // }
-    // printf("\n");
+// printf("LowerAddr: ");
+// for (int i = 0; i < upper_count; i++)
+// {
+//     printf("%d ", lowerAddr[i]);
+// }
+// printf("\n");
 
-    // // print the matrix in dense format
-    // printf("Matrix in dense format:\n");
-    // for (int i = 0; i < n; i++)
-    // {
-    //     for (int j = 0; j < n; j++)
-    //     {
-    //         double value = get_matrix_entry_symmetric_coo(i, j, n, diag, upper, upperAddr, lowerAddr, upper_count);
-    //         printf("%f ", value);
-    //     }
-    //     printf("\n");
-    // }
+// // print the matrix in dense format
+// printf("Matrix in dense format:\n");
+// for (int i = 0; i < n; i++)
+// {
+//     for (int j = 0; j < n; j++)
+//     {
+//         double value = get_matrix_entry_symmetric_coo(i, j, n, diag, upper, upperAddr, lowerAddr, upper_count);
+//         printf("%f ", value);
+//     }
+//     printf("\n");
+// }
 
-    // // Free allocated memory
-    // free(diag);
-    // free(upper);
-    // free(upperAddr);
-    // free(lowerAddr);
+// // Free allocated memory
+// free(diag);
+// free(upper);
+// free(upperAddr);
+// free(lowerAddr);
 
-    // CSR format
-    /*        A
-        1  0  6  0  0
-        0  2  0  0  8
-        6  0  3  0  0
-        0  0  0  4  0
-        0  8  0  0  5
-    */
-    // double values[] = {1.0, 6.0, 2.0, 8.0, 6.0, 3.0, 4.0, 8.0, 5.0};
-    // int col_index[] = {0, 2, 1, 4, 0, 2, 3, 1, 4};
-    // int row_ptr[] = {0, 2, 4, 6, 7, 9}; // lunghezza = n_righe + 1 = 6
+// CSR format
+/*        A
+    1  0  6  0  0
+    0  2  0  0  8
+    6  0  3  0  0
+    0  0  0  4  0
+    0  8  0  0  5
+*/
+// double values[] = {1.0, 6.0, 2.0, 8.0, 6.0, 3.0, 4.0, 8.0, 5.0};
+// int col_index[] = {0, 2, 1, 4, 0, 2, 3, 1, 4};
+// int row_ptr[] = {0, 2, 4, 6, 7, 9}; // lunghezza = n_righe + 1 = 6
 
-    // // print the matrix
-    // printf("Matrix A (CSR format):\n");
-    // printf("Values: ");
-    // for (int i = 0; i < 9; i++)
-    // {
-    //     printf("%f ", values[i]);
-    // }
-    // printf("\n");
-    // printf("Column indices: ");
-    // for (int i = 0; i < 9; i++)
-    // {
-    //     printf("%d ", col_index[i]);
-    // }
-    // printf("\n");
-    // printf("Row pointers: ");
-    // for (int i = 0; i < 6; i++)
-    // {
-    //     printf("%d ", row_ptr[i]);
-    // }
-    // printf("\n\n");
+// // print the matrix
+// printf("Matrix A (CSR format):\n");
+// printf("Values: ");
+// for (int i = 0; i < 9; i++)
+// {
+//     printf("%f ", values[i]);
+// }
+// printf("\n");
+// printf("Column indices: ");
+// for (int i = 0; i < 9; i++)
+// {
+//     printf("%d ", col_index[i]);
+// }
+// printf("\n");
+// printf("Row pointers: ");
+// for (int i = 0; i < 6; i++)
+// {
+//     printf("%d ", row_ptr[i]);
+// }
+// printf("\n\n");
 
-    // for (int i = 0; i < 5; i++)
-    // {
-    //     for (int j = 0; j < 5; j++)
-    //     {
-    //         printf("%f ", get_matrix_entry_csr(i, j, row_ptr, col_index, values));
-    //     }
-    //     printf("\n");
-    // }
+// for (int i = 0; i < 5; i++)
+// {
+//     for (int j = 0; j < 5; j++)
+//     {
+//         printf("%f ", get_matrix_entry_csr(i, j, row_ptr, col_index, values));
+//     }
+//     printf("\n");
+// }
 
 //     return 0;
 // }
