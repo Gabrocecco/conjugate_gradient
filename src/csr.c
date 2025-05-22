@@ -186,14 +186,14 @@ int mv_crs_generic(double *values, // where the non-zero elements are stored, ro
     return 0;
 }
 
-// computes matrix-vector product for symmetric matrices  in CSR format 
+// computes matrix-vector product for symmetric matrices  in CSR format
 void mv_csr_symmetric(int n,                // matrix dimension (n x n)
                       const double *diag,   // diagonal (n dense values )
-                      const double *upper,  // upper non zero values, per row 
-                      const int *col_index, // columns index for upper values 
-                      const int *row_ptr,   // starting index in values for every row 
-                      const double *v,      // input vector 
-                      double *out)          // output vector 
+                      const double *upper,  // upper non zero values, per row
+                      const int *col_index, // columns index for upper values
+                      const int *row_ptr,   // starting index in values for every row
+                      const double *v,      // input vector
+                      double *out)          // output vector
 {
     // Initialize output at zero
     for (int i = 0; i < n; i++)
@@ -201,60 +201,72 @@ void mv_csr_symmetric(int n,                // matrix dimension (n x n)
         out[i] = 0.0;
     }
 
-    // diagonal contribution 
+    // diagonal contribution
     for (int i = 0; i < n; i++)
     {
         out[i] += diag[i] * v[i];
     }
 
-    // upper (and lower) triangular contribute 
-    for (int i = 0; i < n; i++) // for every row 
+    // upper (and lower) triangular contribute
+    for (int i = 0; i < n; i++) // for every row
     {
-        int start = row_ptr[i];     // index of where the non zero elements starts in upper[] in the i-th row 
-        int end = row_ptr[i + 1];   // index of where the non zero elements starts in upper[] in the i+1-th row
+        int start = row_ptr[i];   // index of where the non zero elements starts in upper[] in the i-th row
+        // int end = i >= (n-1) ? n : row_ptr[i + 1]; // index of where the non zero elements starts in upper[] in the i+1-th row
+        
+        int end = row_ptr[i + 1];
 
-        for (int k = start; k < end; k++)   // iterate for every non zero values in i-th row
+        // printf("upper[%d] = %f, start = %d , end = %d \n", i, upper[i], start, end);
+
+        for (int k = start; k < end; k++) // iterate for every non zero values in i-th row
         {
-            int j = col_index[k];   // save column of non zero value A[i][j]
+            int j = col_index[k];   // save column index of non zero value A[i][j]
             double a_ij = upper[k]; // save non zero element A[i][j] value
 
             out[i] += a_ij * v[j]; // direct contribute of A[i][j]
             out[j] += a_ij * v[i]; // symmetric contribute (of A[j][i])
+
         }
     }
 }
 
-// takes the upper triangular part of a symmetric n x n matrix saved in COO 
-// computes the csr_row_ptr[] of CSR format 
-int coo_to_csr(int n,   // dimension of original matrix n x n 
-               int upper_count, // number of non zero elements in upper trinagular part
-               double *coo_upper_values,    // values row by row in upper trinagular part
-               int *coo_row_indx,   // i index array of coo
-               int *coo_col_indx,   // j index array of coo
-               int *csr_row_ptr)    // n + 1 array for raw index of csr format 
+// takes the upper triangular part of a symmetric n x n matrix saved in COO
+// computes the csr_row_ptr[] of CSR format
+int coo_to_csr(int triangular_num_rows,                    // dimension of original matrix n x n
+               int upper_count,          // number of non zero elements in upper trinagular part
+               double *coo_upper_values, // values saved by row in upper trinagular part
+               int *coo_row_indx,        // i index array of coo
+               int *coo_col_indx,        // j index array of coo
+               int *csr_row_ptr)         // n + 1 size array for raw index of csr format
 {
+    // assert(triangular_num_rows > 0);
+    // assert(upper_count > 0);
+
     int current_row = 0; // current row in csr_row_ptr[]
     csr_row_ptr[0] = 0;  // first row pointer is always fixed at zero
 
     for (int i = 0; i < upper_count; i++) // iterate for all non-zero elements
     {
-        int row = coo_row_indx[i]; // row index of current element
-
+        int element_row = coo_row_indx[i]; // save row index of current element
+        // printf("Element visited upper[%d] = %f \n", i, coo_upper_values[i]);
         // if we encounter empty rows, we full them with the same inxed i, until we find the next row with element
-        while (current_row < row) // if the current element is in the next row, we have to update csr_row_ptr[]
+        while (current_row < element_row) // if the current element is in the next row, we have to update csr_row_ptr[]
         {
             csr_row_ptr[current_row + 1] = i; // if we were in row = 2, and we found a new element in row = 3, we need to update csr_row_ptr[3]
             current_row++;                    // update index of csr_row_ptr[]
+
+            // printf("Update to csr_row_ptr[%d] = %d \n", current_row + 1 , i);
         }
     }
 
     // Take care of the last empty rows
     // The last element of csr_row_ptr[triangular_dim] is alwyas = upper_count
     // If you have many last rows without elements they will be all set to upper_count
-    while (current_row < n)
+    while (current_row < triangular_num_rows)
     {
         csr_row_ptr[current_row + 1] = upper_count;
         current_row++;
+
+        printf("Update to csr_row_ptr[%d] = %d \n", current_row + 1 , upper_count);
     }
 
     return 0;

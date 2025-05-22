@@ -132,7 +132,7 @@ int conjugate_gradient_csr(const int n,     // matrix size (n x n)
 {
     printf("CG (CSR) \n\n");
     double norm_factor = 2.0;
-    double *r = (double *)malloc(n * sizeof(double));  // residaul vector r
+    double *r = (double *)malloc(n * sizeof(double));  // residual vector r
     double *p = (double *)malloc(n * sizeof(double));  // direction vector p
     double *Ap = (double *)malloc(n * sizeof(double)); // projction vector A*p
 
@@ -170,6 +170,7 @@ int conjugate_gradient_csr(const int n,     // matrix size (n x n)
         mv_csr_symmetric(n, diag, upper, cols, rows_ptr, p, Ap); // Compute: A p_k
         double alpha = r_dot_r_old / vec_dot(p, Ap, n);          // alpha = (r^T * r) / (p^T * A * p)
 
+        // print alpha 
         vec_axpy(x, p, alpha, x, n); // x_{k+1} = x_k + alpha * p_k
 
         vec_axpy(r, Ap, -alpha, r, n); // r_{k+1} = r_k - alpha * A p_k

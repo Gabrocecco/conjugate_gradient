@@ -229,12 +229,13 @@ int main()
 
     printf("CSR test\n\n\n");
 
+    int triangular_num_rows = count_diag - 1;
     int *csr_row_ptr = (int *)malloc((count_diag + 1) * sizeof(int));
-    coo_to_csr(count_diag, count_upper, upper, upperAddr, lowerAddr, csr_row_ptr);
+    coo_to_csr(triangular_num_rows, count_upper, upper, upperAddr, lowerAddr, csr_row_ptr);
     // print_dense_symmetric_matrix_from_csr(count_diag, diag, upper, lowerAddr, csr_row_ptr);
     // compare_symmetric_matrices_coo_csr(count_diag, diag, upper, upperAddr, lowerAddr, count_upper, diag, upper, lowerAddr, csr_row_ptr);
     printf("Conversion from COO to CSR done \n csr_row_ptr[] = ");
-    print_integer_vector(csr_row_ptr, count_diag + 1);
+    // print_integer_vector(csr_row_ptr, triangular_num_rows + 1);
 
     printf("-------------------------------------------------------------------\n\n");
     for (int i = 0; i < n_tests; i++)

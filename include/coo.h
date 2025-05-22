@@ -23,3 +23,14 @@ void mv_coo_symmetric(int n,               // matrix size (n x n)
             double *out);
 
 void print_dense_symmeric_matrix_from_coo(int n, double *diag, double *upper, int *row_inx, int *col_inx, int upper_count);
+
+int compare_symmetric_matrices_coo_csr(int n,
+    double *diag_coo,
+    double *upper_coo,
+    int *i_idx,
+    int *j_idx,
+    int upper_count,
+    double *diag_csr,
+    double *upper_csr,
+    int *col_index,
+    int *row_ptr);
