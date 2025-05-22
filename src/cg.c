@@ -164,7 +164,7 @@ int conjugate_gradient_csr(const int n,     // matrix size (n x n)
     double r_dot_r_old = vec_dot(r, r, n); // r_k^T * r_k
     double r_dot_r_new = 0.0;
 
-    for (int iter = 0; iter < max_iter; iter++)
+    for (int iter = 1; iter < max_iter; iter++)
     {
         // mv_coo_symmetric(n, upper_count, diag, upper, rows_ptr, cols, p, Ap); // Compute: A p_k
         mv_csr_symmetric(n, diag, upper, cols, rows_ptr, p, Ap); // Compute: A p_k

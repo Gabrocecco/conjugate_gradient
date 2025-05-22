@@ -210,9 +210,9 @@ void mv_csr_symmetric(int n,                // matrix dimension (n x n)
     // upper (and lower) triangular contribute
     for (int i = 0; i < n; i++) // for every row
     {
-        int start = row_ptr[i];   // index of where the non zero elements starts in upper[] in the i-th row
+        int start = row_ptr[i]; // index of where the non zero elements starts in upper[] in the i-th row
         // int end = i >= (n-1) ? n : row_ptr[i + 1]; // index of where the non zero elements starts in upper[] in the i+1-th row
-        
+
         int end = row_ptr[i + 1];
 
         // printf("upper[%d] = %f, start = %d , end = %d \n", i, upper[i], start, end);
@@ -224,14 +224,13 @@ void mv_csr_symmetric(int n,                // matrix dimension (n x n)
 
             out[i] += a_ij * v[j]; // direct contribute of A[i][j]
             out[j] += a_ij * v[i]; // symmetric contribute (of A[j][i])
-
         }
     }
 }
 
 // takes the upper triangular part of a symmetric n x n matrix saved in COO
 // computes the csr_row_ptr[] of CSR format
-int coo_to_csr(int triangular_num_rows,                    // dimension of original matrix n x n
+int coo_to_csr(int triangular_num_rows,  // dimension of original matrix n x n
                int upper_count,          // number of non zero elements in upper trinagular part
                double *coo_upper_values, // values saved by row in upper trinagular part
                int *coo_row_indx,        // i index array of coo
@@ -266,10 +265,74 @@ int coo_to_csr(int triangular_num_rows,                    // dimension of origi
         csr_row_ptr[current_row + 1] = upper_count;
         current_row++;
 
-        printf("Update to csr_row_ptr[%d] = %d \n", current_row + 1 , upper_count);
+        printf("Update to csr_row_ptr[%d] = %d \n", current_row + 1, upper_count);
     }
 
     return 0;
+}
+
+// Converts a matrix in COO format to CSR format.
+// Assumes the input is only the upper triangular part of a symmetric matrix.
+//
+// Parameters:
+//   n             - number of rows (and columns) of the matrix
+//   nnz           - number of non-zero elements (in the upper triangular part)
+//   values        - array of non-zero values (length = nnz)
+//   row_idx       - array of row indices for each value (length = nnz)
+//   col_idx       - array of column indices for each value (length = nnz)
+// Output:
+//   csr_row_ptr   - array of row pointers (length = n + 1)
+//   csr_col_idx   - array of column indices (length = nnz)
+//   csr_values    - array of values (length = nnz)
+void new_coo_to_csr(int n, int nnz,
+                const double *values,
+                const int *row_idx,
+                const int *col_idx,
+                int *csr_row_ptr,
+                int *csr_col_idx,
+                double *csr_values)
+{
+    // Step 1: Initialize csr_row_ptr with zeros
+    for (int i = 0; i <= n; i++)
+        csr_row_ptr[i] = 0;
+
+    // Step 2: Count how many non-zero elements are in each row
+    // This is done by incrementing csr_row_ptr[row + 1] for each COO entry
+    for (int k = 0; k < nnz; k++)
+    {
+        int row = row_idx[k];
+        csr_row_ptr[row + 1]++;
+    }
+
+    // Step 3: Perform prefix sum on csr_row_ptr to get actual row start indices
+    for (int i = 0; i < n; i++)
+    {
+        csr_row_ptr[i + 1] += csr_row_ptr[i];
+    }
+
+    // Step 4: Fill csr_col_idx and csr_values using a temporary row pointer array
+    // This temp array keeps track of the next insertion point for each row
+    int *temp_row_ptr = (int *)malloc(n * sizeof(int));
+    if (!temp_row_ptr)
+    {
+        fprintf(stderr, "Error: failed to allocate memory for temp_row_ptr\n");
+        exit(EXIT_FAILURE);
+    }
+    memcpy(temp_row_ptr, csr_row_ptr, n * sizeof(int));
+
+    for (int k = 0; k < nnz; k++)
+    {
+        int row = row_idx[k];
+        int dest = temp_row_ptr[row]; // get current insert position
+
+        csr_col_idx[dest] = col_idx[k]; // store column index
+        csr_values[dest] = values[k];   // store actual value
+
+        temp_row_ptr[row]++; // move to next insertion point for this row
+    }
+
+    // Step 5: Free temporary storage
+    free(temp_row_ptr);
 }
 
 // int main()

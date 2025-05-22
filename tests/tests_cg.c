@@ -11,7 +11,7 @@
 
 // Test CG with a zero matrix
 void test_zero_matrix()
-{   
+{
     clock_t start = clock();
     printf("\n--- Test: Zero Matrix ---\n");
 
@@ -76,7 +76,6 @@ void test_zero_matrix()
     double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
     printf("Time spent: %f seconds\n", time_spent);
     printf("--- End of Test: Zero Matrix ---\n");
-    
 }
 
 // Test CG with an identity matrix
@@ -256,7 +255,7 @@ void test_sparse_symmetric_random_matrix(int matrix_size, int non_zero_elements_
     clock_t start = clock();
     printf("\n--- Test: Sparse Symmetric Random Matrix ---\n");
 
-    int n = 2000; // Matrix size
+    int n = 2000;                  // Matrix size
     int non_zero_elements = n * 3; // Approximate number of non-zero elements
     printf("Matrix size: %d x %d\n", n, n);
     printf("Number of non-zero elements: %d\n", non_zero_elements);
@@ -300,7 +299,7 @@ void test_sparse_symmetric_random_matrix(int matrix_size, int non_zero_elements_
     for (int i = 0; i < n; i++)
     {
         b[i] = (double)(rand() % 100 + 1); // Random values between 1 and 100
-        x[i] = 0.0; // Initialize x to zero
+        x[i] = 0.0;                        // Initialize x to zero
     }
 
     // Run the conjugate gradient method
@@ -354,12 +353,13 @@ void test_sparse_symmetric_random_matrix(int matrix_size, int non_zero_elements_
     printf("--- End of Test: Sparse Symmetric Random Matrix ---\n");
 }
 
-int test_cg_csr(){
+int test_cg_csr()
+{
     printf("Start of program.\n");
     printf("-------------------------------------------------------------------\n");
 
     printf("Loading input data system from file...\n");
-    const char *filename = "data/data.txt";  // linear system data input (COO) filename 
+    const char *filename = "data/data.txt"; // linear system data input (COO) filename
     FILE *file = fopen(filename, "r");
     if (!file)
     {
@@ -372,7 +372,7 @@ int test_cg_csr(){
     }
 
     printf("Loading solution from OpenFoam for validation...\n");
-    const char *filenameFoamSolution = "data/Phi";   // solution of the linear system from OpenFoam filename 
+    const char *filenameFoamSolution = "data/Phi"; // solution of the linear system from OpenFoam filename
     FILE *fileFoamSolution = fopen(filenameFoamSolution, "r");
     if (!filenameFoamSolution)
     {
@@ -394,9 +394,9 @@ int test_cg_csr(){
     int *lowerAddr = parseIntArray(file, "lowerAddr", &count_lower);
 
     // Parse solution from openFoam
-    double *openFoamSolution = parseDoubleArraySolution(fileFoamSolution, "internalField   nonuniform List<scalar>", &count_solution_openfoam); 
-    
-    //check if the number of elements in the same dimension as b (source)
+    double *openFoamSolution = parseDoubleArraySolution(fileFoamSolution, "internalField   nonuniform List<scalar>", &count_solution_openfoam);
+
+    // check if the number of elements in the same dimension as b (source)
     if (count_diag != count_solution_openfoam)
     {
         printf("Error: The number of elements in the solution vector does not match the number of elements in the source vector.\n");
@@ -485,9 +485,17 @@ int test_cg_csr(){
 
     printf("CSR test\n\n\n");
 
-    int triangular_num_rows = count_diag - 1;
-    int *csr_row_ptr = (int *)malloc((count_diag + 1) * sizeof(int));
-    coo_to_csr(triangular_num_rows, count_upper, upper, upperAddr, lowerAddr, csr_row_ptr);
+    // int triangular_num_rows = count_diag - 1;
+    // int *csr_row_ptr = (int *)malloc((count_diag + 1) * sizeof(int));
+    // coo_to_csr(triangular_num_rows, count_upper, upper, upperAddr, lowerAddr, csr_row_ptr);
+
+    int *csr_row_ptr = malloc((count_diag + 1) * sizeof(int));
+    int *csr_col_idx = malloc(count_upper * sizeof(int));
+    double *csr_values = malloc(count_upper * sizeof(double));
+
+    new_coo_to_csr(count_diag, count_upper, upper, upperAddr, lowerAddr,
+               csr_row_ptr, csr_col_idx, csr_values);
+
     // print_dense_symmetric_matrix_from_csr(count_diag, diag, upper, lowerAddr, csr_row_ptr);
     // compare_symmetric_matrices_coo_csr(count_diag, diag, upper, upperAddr, lowerAddr, count_upper, diag, upper, lowerAddr, csr_row_ptr);
     printf("Conversion from COO to CSR done \n csr_row_ptr[] = ");
@@ -508,9 +516,9 @@ int test_cg_csr(){
             count_diag,
             diag,
             count_upper,
-            upper,
+            csr_values,
             csr_row_ptr,
-            lowerAddr,
+            csr_col_idx,
             source,
             y,
             1000,
@@ -560,8 +568,6 @@ int test_cg_csr(){
     printf("SUMMARY of %d runs: \n", n_tests);
     printf("-------------------------------------------------------------------\n");
     printf("-------------------------------------------------------------------\n");
-    
-
 
     // Free allocated memory
     free(diag);
@@ -571,8 +577,9 @@ int test_cg_csr(){
     free(source);
     free(openFoamSolution);
     free(csr_row_ptr);
+    free(csr_col_idx);
+    free(csr_values);
 
-    
     fclose(file);
     fclose(fileFoamSolution);
     printf("Files closed successfully.\n");
@@ -581,8 +588,8 @@ int test_cg_csr(){
     return 0;
 }
 
-
-int main(){
+int main()
+{
 
     // test_identity_matrix();
 

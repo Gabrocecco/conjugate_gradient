@@ -229,9 +229,17 @@ int main()
 
     printf("CSR test\n\n\n");
 
-    int triangular_num_rows = count_diag - 1;
-    int *csr_row_ptr = (int *)malloc((count_diag + 1) * sizeof(int));
-    coo_to_csr(triangular_num_rows, count_upper, upper, upperAddr, lowerAddr, csr_row_ptr);
+    // int triangular_num_rows = count_diag - 1;
+    // int *csr_row_ptr = (int *)malloc((count_diag + 1) * sizeof(int));
+    // coo_to_csr(triangular_num_rows, count_upper, upper, upperAddr, lowerAddr, csr_row_ptr);
+
+    int *csr_row_ptr = malloc((count_diag + 1) * sizeof(int));
+    int *csr_col_idx = malloc(count_upper * sizeof(int));
+    double *csr_values = malloc(count_upper * sizeof(double));
+
+    new_coo_to_csr(count_diag, count_upper, upper, upperAddr, lowerAddr,
+               csr_row_ptr, csr_col_idx, csr_values);
+
     // print_dense_symmetric_matrix_from_csr(count_diag, diag, upper, lowerAddr, csr_row_ptr);
     // compare_symmetric_matrices_coo_csr(count_diag, diag, upper, upperAddr, lowerAddr, count_upper, diag, upper, lowerAddr, csr_row_ptr);
     printf("Conversion from COO to CSR done \n csr_row_ptr[] = ");
@@ -251,9 +259,9 @@ int main()
             count_diag,
             diag,
             count_upper,
-            upper,
+            csr_values,
             csr_row_ptr,
-            lowerAddr,
+            csr_col_idx,
             source,
             y,
             1000,
@@ -316,6 +324,8 @@ int main()
     free(source);
     free(openFoamSolution);
     free(csr_row_ptr);
+    free(csr_col_idx);
+    free(csr_values);
 
     
     fclose(file);
