@@ -31,7 +31,7 @@ int main()
     printf("-------------------------------------------------------------------\n");
 
     printf("Loading input data system from file...\n");
-    const char *filename = "data/data.txt";  // linear system data input (COO) filename 
+    const char *filename = "data/data.txt"; // linear system data input (COO) filename
     FILE *file = fopen(filename, "r");
     if (!file)
     {
@@ -44,7 +44,7 @@ int main()
     }
 
     printf("Loading solution from OpenFoam for validation...\n");
-    const char *filenameFoamSolution = "data/Phi";   // solution of the linear system from OpenFoam filename 
+    const char *filenameFoamSolution = "data/Phi"; // solution of the linear system from OpenFoam filename
     FILE *fileFoamSolution = fopen(filenameFoamSolution, "r");
     if (!filenameFoamSolution)
     {
@@ -62,13 +62,13 @@ int main()
     double *source = parseDoubleArray(file, "source", &count_diag);
     double *diag = parseDoubleArray(file, "diag", &count_diag);
     double *upper = parseDoubleArray(file, "upper", &count_upper);
-    int *upperAddr = parseIntArray(file, "upperAddr", &count_upper);
-    int *lowerAddr = parseIntArray(file, "lowerAddr", &count_lower);
+    int *upperAddr = parseIntArray(file, "upperAddr", &count_upper); // upperAddr is used as col_index for the upper tringualar part in COO format
+    int *lowerAddr = parseIntArray(file, "lowerAddr", &count_lower); // lowerAddr is used as row_index for the lower tringualar part in COO format
 
     // Parse solution from openFoam
-    double *openFoamSolution = parseDoubleArraySolution(fileFoamSolution, "internalField   nonuniform List<scalar>", &count_solution_openfoam); 
-    
-    //check if the number of elements in the same dimension as b (source)
+    double *openFoamSolution = parseDoubleArraySolution(fileFoamSolution, "internalField   nonuniform List<scalar>", &count_solution_openfoam);
+
+    // check if the number of elements in the same dimension as b (source)
     if (count_diag != count_solution_openfoam)
     {
         printf("Error: The number of elements in the solution vector does not match the number of elements in the source vector.\n");
@@ -173,8 +173,8 @@ int main()
             diag,        // diagonal elements (exactly n dense elements)
             count_upper, // number of non-zero elements in the upper triangular part
             upper,       // non-zero elements in the upper triangular part
-            upperAddr,   // i indexes of non-zero elements (upper)
-            lowerAddr,   // j indexes of non-zero elements (upper)
+            lowerAddr,   // rows indexes
+            upperAddr,   // col indexes
             source,      // input vector
             x,           // output vector
             1000,        // maximum number of iterations
@@ -229,16 +229,10 @@ int main()
 
     printf("CSR test\n\n\n");
 
-    // int triangular_num_rows = count_diag - 1;
-    // int *csr_row_ptr = (int *)malloc((count_diag + 1) * sizeof(int));
-    // coo_to_csr(triangular_num_rows, count_upper, upper, upperAddr, lowerAddr, csr_row_ptr);
+    int *csr_row_ptr = malloc((count_diag + 1) * sizeof(int));  // csr_row_ptr is always of size (number of rows + 1)
 
-    int *csr_row_ptr = malloc((count_diag + 1) * sizeof(int));
-    int *csr_col_idx = malloc(count_upper * sizeof(int));
-    double *csr_values = malloc(count_upper * sizeof(double));
-
-    new_coo_to_csr(count_diag, count_upper, upper, upperAddr, lowerAddr,
-               csr_row_ptr, csr_col_idx, csr_values);
+    coo_to_csr(count_diag, count_upper, upper, lowerAddr, upperAddr,
+               csr_row_ptr);
 
     // print_dense_symmetric_matrix_from_csr(count_diag, diag, upper, lowerAddr, csr_row_ptr);
     // compare_symmetric_matrices_coo_csr(count_diag, diag, upper, upperAddr, lowerAddr, count_upper, diag, upper, lowerAddr, csr_row_ptr);
@@ -259,9 +253,9 @@ int main()
             count_diag,
             diag,
             count_upper,
-            csr_values,
-            csr_row_ptr,
-            csr_col_idx,
+            upper,
+            csr_row_ptr,    // row_ptr 
+            upperAddr,  // col indexes 
             source,
             y,
             1000,
@@ -313,8 +307,6 @@ int main()
     printf("Average time spent in %d runs: %f seconds\n", n_tests, time_spent_acc / n_tests);
     printf("-------------------------------------------------------------------\n");
     printf("-------------------------------------------------------------------\n");
-    
-
 
     // Free allocated memory
     free(diag);
@@ -324,10 +316,7 @@ int main()
     free(source);
     free(openFoamSolution);
     free(csr_row_ptr);
-    free(csr_col_idx);
-    free(csr_values);
 
-    
     fclose(file);
     fclose(fileFoamSolution);
     printf("Files closed successfully.\n");

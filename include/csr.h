@@ -23,7 +23,7 @@ int mv_crs_generic(double *values, // where the non-zero elements are stored, ro
                    int m,          // number of rows of A
                    int n);         // number of columns of A
 
-int coo_to_csr(int triangular_dim,
+int coo_to_csr(int n,
                int upper_count,
                double *coo_upper_values,
                int *coo_row_indx,
@@ -44,10 +44,10 @@ int generate_sparse_symmetric_csr(int n, double density,
                                   int **col_index,
                                   int **row_ptr);
 
-void new_coo_to_csr(int n, int nnz,
-                    const double *values,
-                    const int *row_idx,
-                    const int *col_idx,
-                    int *csr_row_ptr,
-                    int *csr_col_idx,
-                    double *csr_values);
+void sorting_coo_to_csr(int n, int nnz,
+                        const double *values,
+                        const int *row_idx,
+                        const int *col_idx,
+                        int *csr_row_ptr,
+                        int *csr_col_idx,
+                        double *csr_values);

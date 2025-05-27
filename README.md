@@ -16,7 +16,7 @@ conjugate_gradient/
 Supported matrix formats: 
 
 - [x] COO
-- [] CSR
+- [x] CSR
 - [] ELL 
 - [] SELL
 

@@ -33,6 +33,15 @@ test_csr: $(BUILD_DIR) src/csr.c tests/test_csr.c src/utils.c src/coo.c
 	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \
 		-o $(BUILD_DIR)/test_csr src/csr.c src/utils.c src/coo.c tests/test_csr.c -lm
 
+convert_foam_to_mm: $(BUILD_DIR) src/foam_to_mm.c src/parser.c src/mmio.c
+	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \
+		-o $(BUILD_DIR)/foam_to_mm src/foam_to_mm.c src/parser.c src/mmio.c -lm
+
+mm_read: $(BUILD_DIR) src/mm_read.c src/mmio.c
+	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \
+		-o $(BUILD_DIR)/mm_read src/mm_read.c src/mmio.c -lm
+
+
 # === Build directory ===
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

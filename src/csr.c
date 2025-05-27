@@ -230,7 +230,7 @@ void mv_csr_symmetric(int n,                // matrix dimension (n x n)
 
 // takes the upper triangular part of a symmetric n x n matrix saved in COO
 // computes the csr_row_ptr[] of CSR format
-int coo_to_csr(int triangular_num_rows,  // dimension of original matrix n x n
+int coo_to_csr(int n,  // dimension of original matrix n x n
                int upper_count,          // number of non zero elements in upper trinagular part
                double *coo_upper_values, // values saved by row in upper trinagular part
                int *coo_row_indx,        // i index array of coo
@@ -260,7 +260,7 @@ int coo_to_csr(int triangular_num_rows,  // dimension of original matrix n x n
     // Take care of the last empty rows
     // The last element of csr_row_ptr[triangular_dim] is alwyas = upper_count
     // If you have many last rows without elements they will be all set to upper_count
-    while (current_row < triangular_num_rows)
+    while (current_row < n)
     {
         csr_row_ptr[current_row + 1] = upper_count;
         current_row++;
@@ -284,7 +284,7 @@ int coo_to_csr(int triangular_num_rows,  // dimension of original matrix n x n
 //   csr_row_ptr   - array of row pointers (length = n + 1)
 //   csr_col_idx   - array of column indices (length = nnz)
 //   csr_values    - array of values (length = nnz)
-void new_coo_to_csr(int n, int nnz,
+void sorting_coo_to_csr(int n, int nnz,
                 const double *values,
                 const int *row_idx,
                 const int *col_idx,
