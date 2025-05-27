@@ -1,0 +1,286 @@
+
+Initial residual norm: 1.000000
+Iteration 0: Residual norm = 1.12254
+Iteration 1: Residual norm = 1.42572
+Iteration 2: Residual norm = 1.65169
+Iteration 3: Residual norm = 1.71139
+Iteration 4: Residual norm = 2.10326
+Iteration 5: Residual norm = 2.25258
+Iteration 6: Residual norm = 2.3189
+Iteration 7: Residual norm = 2.51188
+Iteration 8: Residual norm = 2.75749
+Iteration 9: Residual norm = 2.64461
+Iteration 10: Residual norm = 2.89389
+Iteration 11: Residual norm = 3.04652
+Iteration 12: Residual norm = 3.03892
+Iteration 13: Residual norm = 3.14591
+Iteration 14: Residual norm = 3.33281
+Iteration 15: Residual norm = 3.30525
+Iteration 16: Residual norm = 3.51008
+Iteration 17: Residual norm = 3.41598
+Iteration 18: Residual norm = 3.55764
+Iteration 19: Residual norm = 3.67501
+Iteration 20: Residual norm = 3.69695
+Iteration 21: Residual norm = 3.862
+Iteration 22: Residual norm = 3.77849
+Iteration 23: Residual norm = 3.86875
+Iteration 24: Residual norm = 4.05903
+Iteration 25: Residual norm = 3.95893
+Iteration 26: Residual norm = 4.1087
+Iteration 27: Residual norm = 4.09204
+Iteration 28: Residual norm = 4.11741
+Iteration 29: Residual norm = 4.35022
+Iteration 30: Residual norm = 4.36827
+Iteration 31: Residual norm = 4.49318
+Iteration 32: Residual norm = 4.47338
+Iteration 33: Residual norm = 4.43975
+Iteration 34: Residual norm = 4.61963
+Iteration 35: Residual norm = 4.66628
+Iteration 36: Residual norm = 5.03699
+Iteration 37: Residual norm = 5.40082
+Iteration 38: Residual norm = 5.62527
+Iteration 39: Residual norm = 5.55231
+Iteration 40: Residual norm = 5.60692
+Iteration 41: Residual norm = 5.88925
+Iteration 42: Residual norm = 5.79203
+Iteration 43: Residual norm = 5.71429
+Iteration 44: Residual norm = 5.95723
+Iteration 45: Residual norm = 5.83386
+Iteration 46: Residual norm = 5.9493
+Iteration 47: Residual norm = 6.08461
+Iteration 48: Residual norm = 6.05679
+Iteration 49: Residual norm = 6.12336
+Iteration 50: Residual norm = 6.03357
+Iteration 51: Residual norm = 6.32596
+Iteration 52: Residual norm = 6.31431
+Iteration 53: Residual norm = 6.23314
+Iteration 54: Residual norm = 6.04724
+Iteration 55: Residual norm = 6.17941
+Iteration 56: Residual norm = 6.22427
+Iteration 57: Residual norm = 6.29919
+Iteration 58: Residual norm = 6.38815
+Iteration 59: Residual norm = 6.31068
+Iteration 60: Residual norm = 6.44704
+Iteration 61: Residual norm = 6.50577
+Iteration 62: Residual norm = 6.44503
+Iteration 63: Residual norm = 6.48273
+Iteration 64: Residual norm = 6.61385
+Iteration 65: Residual norm = 6.64802
+Iteration 66: Residual norm = 6.63051
+Iteration 67: Residual norm = 6.49009
+Iteration 68: Residual norm = 6.42575
+Iteration 69: Residual norm = 6.29281
+Iteration 70: Residual norm = 6.21298
+Iteration 71: Residual norm = 6.21732
+Iteration 72: Residual norm = 6.02176
+Iteration 73: Residual norm = 6.047
+Iteration 74: Residual norm = 6.16447
+Iteration 75: Residual norm = 6.2865
+Iteration 76: Residual norm = 6.50999
+Iteration 77: Residual norm = 6.44217
+Iteration 78: Residual norm = 6.60655
+Iteration 79: Residual norm = 6.58236
+Iteration 80: Residual norm = 6.75698
+Iteration 81: Residual norm = 7.20206
+Iteration 82: Residual norm = 7.10013
+Iteration 83: Residual norm = 7.23974
+Iteration 84: Residual norm = 7.39082
+Iteration 85: Residual norm = 7.39709
+Iteration 86: Residual norm = 7.57827
+Iteration 87: Residual norm = 7.51089
+Iteration 88: Residual norm = 7.50341
+Iteration 89: Residual norm = 7.12296
+Iteration 90: Residual norm = 6.7176
+Iteration 91: Residual norm = 5.89089
+Iteration 92: Residual norm = 4.88357
+Iteration 93: Residual norm = 4.08498
+Iteration 94: Residual norm = 3.62052
+Iteration 95: Residual norm = 3.58333
+Iteration 96: Residual norm = 3.96013
+Iteration 97: Residual norm = 4.44137
+Iteration 98: Residual norm = 4.20589
+Iteration 99: Residual norm = 3.52955
+Iteration 100: Residual norm = 3.01383
+Iteration 101: Residual norm = 2.84105
+Iteration 102: Residual norm = 2.82908
+Iteration 103: Residual norm = 2.59274
+Iteration 104: Residual norm = 2.18362
+Iteration 105: Residual norm = 2.02351
+Iteration 106: Residual norm = 1.94107
+Iteration 107: Residual norm = 1.81968
+Iteration 108: Residual norm = 1.60931
+Iteration 109: Residual norm = 1.52026
+Iteration 110: Residual norm = 1.55493
+Iteration 111: Residual norm = 1.47033
+Iteration 112: Residual norm = 1.34731
+Iteration 113: Residual norm = 1.35149
+Iteration 114: Residual norm = 1.32069
+Iteration 115: Residual norm = 1.20409
+Iteration 116: Residual norm = 1.16772
+Iteration 117: Residual norm = 1.18755
+Iteration 118: Residual norm = 1.14041
+Iteration 119: Residual norm = 1.07142
+Iteration 120: Residual norm = 1.05199
+Iteration 121: Residual norm = 0.971999
+Iteration 122: Residual norm = 0.844746
+Iteration 123: Residual norm = 0.840208
+Iteration 124: Residual norm = 0.814209
+Iteration 125: Residual norm = 0.724691
+Iteration 126: Residual norm = 0.714311
+Iteration 127: Residual norm = 0.677451
+Iteration 128: Residual norm = 0.618324
+Iteration 129: Residual norm = 0.611216
+Iteration 130: Residual norm = 0.576002
+Iteration 131: Residual norm = 0.545261
+Iteration 132: Residual norm = 0.512867
+Iteration 133: Residual norm = 0.461277
+Iteration 134: Residual norm = 0.372529
+Iteration 135: Residual norm = 0.318525
+Iteration 136: Residual norm = 0.268317
+Iteration 137: Residual norm = 0.226509
+Iteration 138: Residual norm = 0.223071
+Iteration 139: Residual norm = 0.215363
+Iteration 140: Residual norm = 0.20355
+Iteration 141: Residual norm = 0.18527
+Iteration 142: Residual norm = 0.175749
+Iteration 143: Residual norm = 0.17184
+Iteration 144: Residual norm = 0.163574
+Iteration 145: Residual norm = 0.155057
+Iteration 146: Residual norm = 0.135338
+Iteration 147: Residual norm = 0.137114
+Iteration 148: Residual norm = 0.133488
+Iteration 149: Residual norm = 0.127597
+Iteration 150: Residual norm = 0.127225
+Iteration 151: Residual norm = 0.114355
+Iteration 152: Residual norm = 0.113046
+Iteration 153: Residual norm = 0.104622
+Iteration 154: Residual norm = 0.0972943
+Iteration 155: Residual norm = 0.103317
+Iteration 156: Residual norm = 0.10221
+Iteration 157: Residual norm = 0.0974023
+Iteration 158: Residual norm = 0.0932146
+Iteration 159: Residual norm = 0.0907906
+Iteration 160: Residual norm = 0.0790931
+Iteration 161: Residual norm = 0.0727936
+Iteration 162: Residual norm = 0.0676765
+Iteration 163: Residual norm = 0.0597591
+Iteration 164: Residual norm = 0.0559109
+Iteration 165: Residual norm = 0.0510219
+Iteration 166: Residual norm = 0.0453053
+Iteration 167: Residual norm = 0.042241
+Iteration 168: Residual norm = 0.0387312
+Iteration 169: Residual norm = 0.0350019
+Iteration 170: Residual norm = 0.0311302
+Iteration 171: Residual norm = 0.0273801
+Iteration 172: Residual norm = 0.0263855
+Iteration 173: Residual norm = 0.0232997
+Iteration 174: Residual norm = 0.0227058
+Iteration 175: Residual norm = 0.0210655
+Iteration 176: Residual norm = 0.0188845
+Iteration 177: Residual norm = 0.0173936
+Iteration 178: Residual norm = 0.0149121
+Iteration 179: Residual norm = 0.0131466
+Iteration 180: Residual norm = 0.0119109
+Iteration 181: Residual norm = 0.0109866
+Iteration 182: Residual norm = 0.0106983
+Iteration 183: Residual norm = 0.0107074
+Iteration 184: Residual norm = 0.0101582
+Iteration 185: Residual norm = 0.0093349
+Iteration 186: Residual norm = 0.00889345
+Iteration 187: Residual norm = 0.00839189
+Iteration 188: Residual norm = 0.00778796
+Iteration 189: Residual norm = 0.00702142
+Iteration 190: Residual norm = 0.00629103
+Iteration 191: Residual norm = 0.00543917
+Iteration 192: Residual norm = 0.00464872
+Iteration 193: Residual norm = 0.00395207
+Iteration 194: Residual norm = 0.00363014
+Iteration 195: Residual norm = 0.00358993
+Iteration 196: Residual norm = 0.00320162
+Iteration 197: Residual norm = 0.00275751
+Iteration 198: Residual norm = 0.00228368
+Iteration 199: Residual norm = 0.00199379
+Iteration 200: Residual norm = 0.0019058
+Iteration 201: Residual norm = 0.00186146
+Iteration 202: Residual norm = 0.00168856
+Iteration 203: Residual norm = 0.00144655
+Iteration 204: Residual norm = 0.0012667
+Iteration 205: Residual norm = 0.00115739
+Iteration 206: Residual norm = 0.00108441
+Iteration 207: Residual norm = 0.000932619
+Iteration 208: Residual norm = 0.000826096
+Iteration 209: Residual norm = 0.000809093
+Iteration 210: Residual norm = 0.000744577
+Iteration 211: Residual norm = 0.000693332
+Iteration 212: Residual norm = 0.0006197
+Iteration 213: Residual norm = 0.000564037
+Iteration 214: Residual norm = 0.000531168
+Iteration 215: Residual norm = 0.000447816
+Iteration 216: Residual norm = 0.000384417
+Iteration 217: Residual norm = 0.000345712
+Iteration 218: Residual norm = 0.000301952
+Iteration 219: Residual norm = 0.000234448
+Iteration 220: Residual norm = 0.000198115
+Iteration 221: Residual norm = 0.000175926
+Iteration 222: Residual norm = 0.000155847
+Iteration 223: Residual norm = 0.000130863
+Iteration 224: Residual norm = 0.000116611
+Iteration 225: Residual norm = 0.000107991
+Iteration 226: Residual norm = 8.75148e-05
+Iteration 227: Residual norm = 7.17984e-05
+Iteration 228: Residual norm = 6.06222e-05
+Iteration 229: Residual norm = 5.11034e-05
+Iteration 230: Residual norm = 4.31965e-05
+Iteration 231: Residual norm = 3.63169e-05
+Iteration 232: Residual norm = 3.23913e-05
+Iteration 233: Residual norm = 2.59529e-05
+Iteration 234: Residual norm = 2.14118e-05
+Iteration 235: Residual norm = 1.8925e-05
+Iteration 236: Residual norm = 1.59601e-05
+Iteration 237: Residual norm = 1.35098e-05
+Iteration 238: Residual norm = 1.16948e-05
+Iteration 239: Residual norm = 1.02488e-05
+Iteration 240: Residual norm = 8.34901e-06
+Iteration 241: Residual norm = 6.97862e-06
+Iteration 242: Residual norm = 5.92057e-06
+Iteration 243: Residual norm = 4.87917e-06
+Iteration 244: Residual norm = 3.81556e-06
+Iteration 245: Residual norm = 3.00386e-06
+Iteration 246: Residual norm = 2.38586e-06
+Iteration 247: Residual norm = 1.96686e-06
+Iteration 248: Residual norm = 1.72509e-06
+Iteration 249: Residual norm = 1.52649e-06
+Iteration 250: Residual norm = 1.27357e-06
+Iteration 251: Residual norm = 1.08951e-06
+
+Residual norm: 1e-06
+Time spent: 0.037375 seconds
+Converged in 253 iterations.
+
+x[0] = 1.4813729739 | OpenFoam: x[0] = 1.4788100000 | difference: 0.002563 | 0.256%
+x[1] = 1.4754126020 | OpenFoam: x[1] = 1.4728600000 | difference: 0.002553 | 0.255%
+x[2] = 1.4648651693 | OpenFoam: x[2] = 1.4623300000 | difference: 0.002535 | 0.254%
+x[3] = 1.4506823176 | OpenFoam: x[3] = 1.4481800000 | difference: 0.002502 | 0.250%
+x[4] = 1.4335494980 | OpenFoam: x[4] = 1.4310900000 | difference: 0.002459 | 0.246%
+...
+x[1995] = 2.5664887732 | OpenFoam: x[1995] = 2.5632100000 | difference: 0.003279 | 0.328%
+x[1996] = 2.4762337511 | OpenFoam: x[1996] = 2.4730200000 | difference: 0.003214 | 0.321%
+x[1997] = 2.3835707885 | OpenFoam: x[1997] = 2.3804300000 | difference: 0.003141 | 0.314%
+x[1998] = 2.2890783424 | OpenFoam: x[1998] = 2.2860200000 | difference: 0.003058 | 0.306%
+x[1999] = 2.1934417353 | OpenFoam: x[1999] = 2.1904700000 | difference: 0.002972 | 0.297%
+)
+RMSE: 0.003061
+Euclidean distance: 0.136891
+Max component difference: 0.004555
+End of test number 1
+-------------------------------------------------------------------
+
+
+-------------------------------------------------------------------
+-------------------------------------------------------------------
+SUMMARY of 1 runs: 
+Average time spent in 1 runs: 0.037375 seconds
+-------------------------------------------------------------------
+-------------------------------------------------------------------
+Files closed successfully.
+End of program.

@@ -134,16 +134,23 @@ void test_coo_to_csr_with_print()
 {
     // define COO 
     int n = 4; 
-    int triangular_num_rows = n - 1;
     int upper_count = 3;
+    // double diag[] = {1, 2, 3, 4};
+    // double upper[] = {5, 6, 7}; 
+    // int coo_row_inx[] = {0, 0, 2};
+    // int col_index[] = {2, 3, 3};
+
     double diag[] = {1, 2, 3, 4};
-    double upper[] = {5, 6, 7}; 
+    double upper[] = {6, 5, 7}; 
     int coo_row_inx[] = {0, 0, 2};
-    int col_index[] = {2, 3, 3};
+    int col_index[] = {3, 2, 3};
 
     int csr_row_ptr[n + 1];
+    int col_inx_ordered[3];
+    double upper_ordered[3];
 
-    coo_to_csr(triangular_num_rows, upper_count, upper, coo_row_inx, col_index, csr_row_ptr);
+    // coo_to_csr(n , upper_count, upper, coo_row_inx, col_index, csr_row_ptr);
+    new_coo_to_csr(n, upper_count, upper, coo_row_inx, col_index, csr_row_ptr, col_inx_ordered, upper_ordered);
     printf("\nCSR Matrix in dense format:\n");
     print_dense_symmetric_matrix_from_csr(n, diag, upper, col_index, csr_row_ptr);
 
@@ -151,12 +158,16 @@ void test_coo_to_csr_with_print()
     print_double_vector(diag, n);
     printf("\nupper[]: ");
     print_double_vector(upper, upper_count);
+    printf("\nupper_ordered[]: ");
+    print_double_vector(upper_ordered, upper_count);
     printf("\ncoo_row_inx[]: ");
     print_integer_vector(coo_row_inx, upper_count);
     printf("\ncsr_row_ptr[]: ");
     print_integer_vector(csr_row_ptr, n);
     printf("\ncol_index[]: ");
     print_integer_vector(col_index, upper_count);
+    printf("\ncol_ordered[]: ");
+    print_integer_vector(col_inx_ordered, upper_count);
 
     printf("\nCOO Matrix in dense format:\n");
     print_dense_symmeric_matrix_from_coo(n, diag, upper, coo_row_inx, col_index, upper_count);

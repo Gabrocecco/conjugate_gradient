@@ -301,7 +301,7 @@ void new_coo_to_csr(int n, int nnz,
     for (int k = 0; k < nnz; k++)
     {
         int row = row_idx[k];
-        csr_row_ptr[row + 1]++;
+        csr_row_ptr[row + 1]++; // in csr_row_ptr[i+1] we have the number of non zero in row i
     }
 
     // Step 3: Perform prefix sum on csr_row_ptr to get actual row start indices
