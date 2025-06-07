@@ -3,7 +3,7 @@
 
 /* 
   Compilation for RISC-V:  
-  riscv64-unknown-elf-gcc -O2 -march=rv64gcv -mabi=lp64d -o reduction_vec_rv reduction_vec.c
+  riscv64-unknown-elf-gcc -O0 -march=rv64gcv -mabi=lp64d -o reduction_vec_rv reduction_vec.c
   
   Run on Spike: 
   spike --isa=rv64gcv pk reduction_vec_rv
