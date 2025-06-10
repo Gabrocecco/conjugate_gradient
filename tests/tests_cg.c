@@ -721,13 +721,20 @@ int test_cg_ell()
 
     printf("ELL test\n\n\n");
 
+    // Compute the maximum number of non-zero elements in each row of the upper triangular part
     int nnz_max = compute_max_nnz_row_upper(count_diag, count_upper, lowerAddr, upperAddr);
+    printf("nnz_max = %d\n", nnz_max);
+    // Allocate memory for the ELL format
     double *ell_values = malloc(nnz_max * count_diag * sizeof(double));
     int *ell_col_idx = malloc(nnz_max * count_diag * sizeof(int));
 
+    // Convert the COO format to ELL format
     coo_to_ell_symmetric_upper(count_diag, count_upper, upper, lowerAddr, upperAddr,
                                ell_values, ell_col_idx, nnz_max);
-
+    
+                               // Print the ELL format analysis
+    analyze_ell_matrix(count_diag, nnz_max, ell_values, ell_col_idx);
+    
     int n_tests = 1;
     printf("-------------------------------------------------------------------\n\n");
     for (int i = 0; i < n_tests; i++)
