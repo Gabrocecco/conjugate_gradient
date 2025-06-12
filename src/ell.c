@@ -4,81 +4,6 @@
 #include "ell.h"
 
 /*
-    From COO format to ELL format for symmetric matrix, saving all elements.    TO-DO: test this function
-*/
-void coo_to_ell_symmetric_full(int n,              // dimension of matrix A (n x n)
-                               double *diag,       // diagonal values of A
-                               int upper_nnz,      // number of non-zeros in upper triangular part
-                               double *coo_values, // values of upper triangular part
-                               int *coo_rows,      // row indices of upper triangular part
-                               int *coo_cols,      // column indices of upper triangular part
-                               double *ell_values, // ELL values array (to be filled)
-                               int *ell_cols       // ELL column indices array (to be filled)
-)
-{
-
-    // Determine maximum number of non-zeros per row (including diagonal and symmetric elements)
-    int *row_counts = (int *)calloc(n, sizeof(int));
-
-    for (int i = 0; i < n; ++i)
-        row_counts[i]++; // diagonal element
-
-    for (int i = 0; i < upper_nnz; ++i)
-    {
-        int row = coo_rows[i];
-        int col = coo_cols[i];
-        row_counts[row]++;
-        row_counts[col]++;
-    }
-
-    int max_nnz_row = 0;
-    for (int i = 0; i < n; ++i)
-    {
-        if (row_counts[i] > max_nnz_row)
-            max_nnz_row = row_counts[i];
-    }
-
-    // Initialize ELLPACK arrays
-    memset(ell_values, 0, n * max_nnz_row * sizeof(double));
-    for (int i = 0; i < n * max_nnz_row; ++i)
-        ell_cols[i] = -1;
-
-    int *current_count = (int *)calloc(n, sizeof(int));
-
-    // Insert diagonal elements
-    for (int row = 0; row < n; ++row)
-    {
-        int ell_offset = row * max_nnz_row;
-        ell_values[ell_offset] = diag[row];
-        ell_cols[ell_offset] = row;
-        current_count[row] = 1;
-    }
-
-    // Insert upper and symmetric lower elements
-    for (int i = 0; i < upper_nnz; ++i)
-    {
-        int row = coo_rows[i];
-        int col = coo_cols[i];
-        double val = coo_values[i];
-
-        // upper triangular insertion
-        int ell_offset_row = row * max_nnz_row + current_count[row];
-        ell_values[ell_offset_row] = val;
-        ell_cols[ell_offset_row] = col;
-        current_count[row]++;
-
-        // symmetric lower triangular insertion
-        int ell_offset_col = col * max_nnz_row + current_count[col];
-        ell_values[ell_offset_col] = val;
-        ell_cols[ell_offset_col] = row;
-        current_count[col]++;
-    }
-
-    free(row_counts);
-    free(current_count);
-}
-
-/*
     MatVec prodcut for generic matrix A (nxx) in ELL format.    TO-DO: test this function
 */
 
@@ -180,7 +105,7 @@ void mv_ell_symmetric_upper_opt(int n,              // dimension of matrix A (n 
         int base = i * max_nnz_row; // base offset for the current row in ELL arrays
 
         // for each row of ELL, iterate over the upper triangular elements
-        for (int j = 0; j < max_nnz_row; ++j)   // ! possible loop unrolling, max_nnz_row is small and constant
+        for (int j = 0; j < max_nnz_row; ++j) // possible loop unrolling, max_nnz_row is small and constant
         {
             /* We are in the i-th row of A, every row of ELL has exactly max_nnz_row values, and in the current row we are on the j-th element*/
             int offset = base + j; // compute offset in the ELL arrays
@@ -422,4 +347,220 @@ void analyze_ell_matrix(int n, int nnz_max, double *ell_values, int *ell_col_idx
     // print percentage of rows with exactly 3 non-zero values
     double percentage_rows_with_3 = 100.0 * count_rows_with_3 / n;
     printf("Percentage of rows with exactly 3 non-zero values: %.2f%%\n", percentage_rows_with_3);
+}
+
+#include <stdio.h>
+
+/*
+    Analyze ELL (column-major) for symmetric matrix:
+    - n        = number of rows
+    - nnz_max  = max non-zeros per row (number of “slots”)
+    - ell_values[idx]  stores the value at slot j, row i via idx = j*n + i
+    - ell_col_idx[idx] stores the corresponding column index (or –1 if padding)
+*/
+void analyze_ell_matrix_colmajor(int n, int nnz_max,
+                                 const double *ell_values,
+                                 const int    *ell_col_idx)
+{
+    int padding_count          = 0;
+    int mismatch_count         = 0;
+    int count_rows_with_1      = 0;
+    int count_rows_with_2      = 0;
+    int count_rows_with_3      = 0;
+    int count_rows_with_4      = 0;
+
+
+    // --- Print values row by row ---
+    printf("ELL values (row × slot):\n");
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < nnz_max; ++j) {
+            int idx = j * n + i;
+            double v = ell_values[idx];
+            printf("%8.2f ", v);
+            if (v == 0.0) {
+                padding_count++;
+                if (ell_col_idx[idx] != -1) {
+                    mismatch_count++;
+                }
+            }
+        }
+        printf("\n");
+    }
+
+    // --- Print column-indices row by row ---
+    printf("\nELL column indices (row × slot):\n");
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < nnz_max; ++j) {
+            int idx = j * n + i;
+            printf("%4d ", ell_col_idx[idx]);
+        }
+        printf("\n");
+    }
+
+    // --- General statistics ---
+    int total_slots    = n * nnz_max;
+    double padding_pct = 100.0 * padding_count  / total_slots;
+    double utilization = 100.0 * (total_slots - padding_count) / total_slots;
+
+    printf("\nTotal slots: %d\n", total_slots);
+    printf("Padding count: %d\n", padding_count);
+    printf("Padding percentage: %.2f%%\n", padding_pct);
+    printf("Memory utilization: %.2f%%\n", utilization);
+    if (mismatch_count == 0)
+        printf("All zero values correctly marked with column index -1.\n");
+    else
+        printf("Warning: %d padding entries have col_idx != -1.\n", mismatch_count);
+
+    // --- Count rows by number of real non-zero entries ---
+    for (int i = 0; i < n; ++i) {
+        int real_count = 0;
+        for (int j = 0; j < nnz_max; ++j) {
+            int idx = j * n + i;
+            if (ell_values[idx] != 0.0)
+                real_count++;
+        }
+        if (real_count == 1)      count_rows_with_1++;
+        else if (real_count == 2) count_rows_with_2++;
+        else if (real_count == 3) count_rows_with_3++;
+        else if (real_count == 4) count_rows_with_4++;
+    }
+
+    double pct1 = 100.0 * count_rows_with_1 / n;
+    double pct2 = 100.0 * count_rows_with_2 / n;
+    double pct3 = 100.0 * count_rows_with_3 / n;
+    double pct4 = 100.0 * count_rows_with_4 / n;
+
+    printf("\nRows with exactly 1 non-zero: %d of %d (%.2f%%)\n",
+           count_rows_with_1, n, pct1);
+    printf("Rows with exactly 2 non-zeros: %d of %d (%.2f%%)\n",
+           count_rows_with_2, n, pct2);
+    printf("Rows with exactly 3 non-zeros: %d of %d (%.2f%%)\n",
+           count_rows_with_3, n, pct3);
+    printf("Rows with exactly 4 non-zeros: %d of %d (%.2f%%)\n",
+           count_rows_with_4, n, pct4);
+}
+
+
+/*
+    COO -> ELL conversion for symmetric matrix: upper triangular part only
+    Stored in COLUMN-MAJOR order.
+*/
+void coo_to_ell_symmetric_upper_colmajor(int n,                    // dimension of matrix A (n x n)
+                                         int upper_nnz,            // number of non-zeros in upper triangular part
+                                         double *coo_values_upper, // values of upper triangular part
+                                         int *coo_rows,            // row indices of upper triangular part
+                                         int *coo_cols,            // column indices of upper triangular part
+                                         double *ell_values,       // ELL values array (to be filled; size = n * max_nnz_row)
+                                         int *ell_cols,            // ELL column indices array (to be filled; same size)
+                                         int max_nnz_row           // maximum number of non-zeros per row in ELL format
+)
+{
+    // 1) allocate current_count array to keep track of how many elements we have already inserted in each row
+    int *current_count = (int *)calloc(n, sizeof(int));
+    if (!current_count)
+    {
+        fprintf(stderr, "Error: calloc failed\n");
+        return;
+    }
+
+    // 2) initialize ELL arrays
+    // ELL values at 0
+    memset(ell_values, 0, n * max_nnz_row * sizeof(double));
+    // ELL column indices to -1 (indicating no entry)
+    for (int k = 0; k < n * max_nnz_row; ++k)
+    {
+        ell_cols[k] = -1;
+    }
+
+    // 3) save in ELL arrays every COO entry
+    // iterate over all the upper triangular non zeros
+    for (int k = 0; k < upper_nnz; ++k)
+    {
+        // for each element, save row, col and values of the current upper triangular element from COO format
+        int row = coo_rows[k];
+        int col = coo_cols[k];
+        double val = coo_values_upper[k];
+
+        // verify that the element is in the upper triangular part
+        if (col <= row)
+        {
+            printf("Error: Found non-upper element in COO: row=%d, col=%d\n", row, col);
+            free(current_count);
+            return;
+        }
+
+        // slot is the column index of ELL columns for the current element
+        int slot = current_count[row];
+        current_count[row]++; // next time we will insert a value from this row, we will use the next slot
+
+        // check if we have exceeded the maximum number of non-zeros per row
+        if (slot >= max_nnz_row)
+        {
+            printf("Error: row %d has more than %d non-zeros\n", row, max_nnz_row);
+            free(current_count);
+            return;
+        }
+
+        // we are in slot column of ELL, each slot is exactly n elements, in this slot we are on the row-th element
+        ell_values[slot * n + row] = val;
+        ell_cols[slot * n + row] = col;
+    }
+
+    free(current_count);
+}
+
+/*
+    MatVec for symmetric matrix in ELL format (upper triangular only + full diagonal stored separately)
+    Stored in COLUMN-MAJOR order.
+*/
+void mv_ell_symmetric_upper_colmajor(int n,              // dimension of matrix A (n x n)
+                                     int max_nnz_row,    // maximum number of non-zeros per row in ELL format
+                                     double *diag,       // diagonal elements (size n)
+                                     double *ell_values, // ELL values array (size n * max_nnz_row)
+                                     int *ell_cols,      // ELL column indices array (size n * max_nnz_row)
+                                     double *x,          // input vector (size n)
+                                     double *y           // output vector (size n)
+)
+{
+    // 1) initialize y = 0
+    for (int i = 0; i < n; ++i)
+    {
+        y[i] = 0.0;
+    }
+
+    // 2) diagonal contribution
+    for (int i = 0; i < n; ++i)
+    {
+        y[i] = y[i] + diag[i] * x[i];
+    }
+
+    // 3) for each "slot" j in ELL (column-major)
+    for (int j = 0; j < max_nnz_row; ++j)
+    {
+        for (int i = 0; i < n; ++i) // iterate over rows (elements on the j-th slot)
+        {
+            /* Each slot has exactly n elements. We are in the j-th slot at the i-th element.*/
+            int offset = j * n + i; // compute offset via offset
+            /* ell_values and ell_cols have the same layout. */
+            int col = ell_cols[offset]; // extract column offset of the current element
+
+            if (col == -1)
+            {
+                // padding entry, skip (accumulate zero)
+                continue;
+            }
+            if (col <= i)
+            {
+                // non-upper entry found → error
+                printf("Error: non-upper element at row=%d, col=%d\n", i, col);
+                return;
+            }
+
+            double v = ell_values[offset]; // extract value of the current element
+            // accumulate contribution for row i
+            y[i] = y[i] + v * x[col];
+            // symmetric contribution for row col
+            y[col] = y[col] + v * x[i];
+        }
+    }
 }
