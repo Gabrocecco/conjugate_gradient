@@ -150,7 +150,8 @@ void test_coo_to_csr_with_print()
     double upper_ordered[3];
 
     // coo_to_csr(n , upper_count, upper, coo_row_inx, col_index, csr_row_ptr);
-    new_coo_to_csr(n, upper_count, upper, coo_row_inx, col_index, csr_row_ptr, col_inx_ordered, upper_ordered);
+    // new_coo_to_csr(n, upper_count, upper, coo_row_inx, col_index, csr_row_ptr, col_inx_ordered, upper_ordered);
+    coo_to_csr(n, upper_count, upper, coo_row_inx, col_index, csr_row_ptr);
     printf("\nCSR Matrix in dense format:\n");
     print_dense_symmetric_matrix_from_csr(n, diag, upper, col_index, csr_row_ptr);
 

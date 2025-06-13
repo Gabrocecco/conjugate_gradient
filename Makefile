@@ -5,20 +5,21 @@ OPT_FLAGS=-O3 -DNDEBUG -march=native -mtune=native
 
 BUILD_DIR=build
 
-all: debug
+# === Build all executables ===
+all: $(BUILD_DIR) debug release test_cg test_coo test_csr test_ell convert_foam_to_mm mm_read
 
 run: 
 	./$(BUILD_DIR)/main
 
 # === Debug build ===
-debug: $(BUILD_DIR) src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c src/utils.c 
+debug: $(BUILD_DIR) src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c src/ell.c src/utils.c 
 	$(CC) $(CFLAGS) $(DEBUG_FLAGS) \
-		-o $(BUILD_DIR)/main src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c src/utils.c -lm
+		-o $(BUILD_DIR)/main_debug src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/ell.c src/cg.c src/utils.c -lm
 
 # === Release build ===
-release: $(BUILD_DIR) src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c src/utils.c 
+release: $(BUILD_DIR) src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/ell.c src/cg.c src/utils.c 
 	$(CC) $(CFLAGS) $(OPT_FLAGS) \
-		-o $(BUILD_DIR)/main src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/cg.c src/utils.c  -lm
+		-o $(BUILD_DIR)/main_release src/main.c src/parser.c src/vec.c src/coo.c src/csr.c src/ell.c src/cg.c src/utils.c  -lm
 
 # === Test executables ===
 test_cg: $(BUILD_DIR) tests/tests_cg.c src/vec.c src/coo.c src/cg.c src/csr.c src/ell.c src/utils.c src/parser.c
