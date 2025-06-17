@@ -46,7 +46,7 @@ void coo_to_ell_symmetric_upper(int n,
                                 int *coo_rows,
                                 int *coo_cols,
                                 double *ell_values,
-                                int *ell_cols, 
+                                int *ell_cols,
                                 int max_nnz_row);
 
 // Matrix-vector multiplication for generic ELLPACK matrix
@@ -73,28 +73,55 @@ void mv_ell_symmetric_upper(int n, int max_nnz_row,
 
 int compute_max_nnz_row_upper(int n, int upper_nnz, int *coo_rows, int *coo_cols);
 
+int compute_max_nnz_row_full(int n,
+                             int upper_nnz,
+                             const int *coo_rows,
+                             const int *coo_cols);
+
 void analyze_ell_matrix(int n, int nnz_max, double *ell_values, int *ell_col_idx);
 
-void coo_to_ell_symmetric_upper_colmajor(int n,                           // dimension of matrix A (n x n)
-                                         int upper_nnz,                   // number of non-zeros in upper triangular part
-                                         double coo_values_upper[], // values of upper triangular part
-                                         int coo_rows[],            // row indices of upper triangular part
-                                         int coo_cols[],            // column indices of upper triangular part
-                                         double ell_values[],             // ELL values array (to be filled; size = n * max_nnz_row)
-                                         int ell_cols[],                  // ELL column indices array (to be filled; same size)
-                                         int max_nnz_row                  // maximum number of non-zeros per row in ELL format
+void coo_to_ell_symmetric_upper_colmajor(int n,                    // dimension of matrix A (n x n)
+                                         int upper_nnz,            // number of non-zeros in upper triangular part
+                                         double *coo_values_upper, // values of upper triangular part
+                                         int *coo_rows,            // row indices of upper triangular part
+                                         int *coo_cols,            // column indices of upper triangular part
+                                         double *ell_values,       // ELL values array (to be filled; size = n * max_nnz_row)
+                                         int *ell_cols,            // ELL column indices array (to be filled; same size)
+                                         int max_nnz_row           // maximum number of non-zeros per row in ELL format
 );
 
-void mv_ell_symmetric_upper_colmajor(int n,                     // dimension of matrix A (n x n)
-                                     int max_nnz_row,           // maximum number of non-zeros per row in ELL format
-                                     double diag[],       // diagonal elements (size n)
-                                     double ell_values[], // ELL values array (size n * max_nnz_row)
-                                     int ell_cols[],      // ELL column indices array (size n * max_nnz_row)
-                                     double x[],          // input vector (size n)
-                                     double y[]                 // output vector (size n)
+void coo_to_ell_symmetric_full_colmajor(int n,
+                                        int upper_nnz,
+                                        double *coo_values_upper,
+                                        int *coo_rows,
+                                        int *coo_cols,
+                                        double *ell_values,
+                                        int *ell_cols,
+                                        int max_nnz_row);
+
+void mv_ell_symmetric_upper_colmajor(int n,              // dimension of matrix A (n x n)
+                                     int max_nnz_row,    // maximum number of non-zeros per row in ELL format
+                                     double *diag,       // diagonal elements (size n)
+                                     double *ell_values, // ELL values array (size n * max_nnz_row)
+                                     int *ell_cols,      // ELL column indices array (size n * max_nnz_row)
+                                     double *x,          // input vector (size n)
+                                     double *y           // output vector (size n)
+);
+
+void mv_ell_symmetric_full_colmajor(int n,              // dimension of matrix A (n x n)
+                                    int max_nnz_row,    // maximum number of non-zeros per row in ELL format
+                                    double *diag,       // diagonal elements (size n)
+                                    double *ell_values, // ELL values array (size n * max_nnz_row)
+                                    int *ell_cols,      // ELL column indices array (size n * max_nnz_row)
+                                    double *x,          // input vector (size n)
+                                    double *y           // output vector (size n)
 );
 
 void analyze_ell_matrix_colmajor(int n, int nnz_max,
-                                 const double ell_values[],
-                                 const int    ell_col_idx[]);
+                                 const double *ell_values,
+                                 const int *ell_col_idx);
+
+void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
+                                      const double *ell_values,
+                                      const int *ell_col_idx);
 #endif // ELLPACK_H

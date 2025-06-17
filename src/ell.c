@@ -226,6 +226,50 @@ int compute_max_nnz_row_upper(int n,         // dimension of matrix A (n x n)
 }
 
 /*
+    Compute the maximum number of non-zero elements in each row of a full symmetric matrix
+    in COO format, considering both upper and lower triangular parts.
+    This function assumes that the input is a full symmetric matrix, so it counts both
+    upper and lower triangular elements.
+*/
+int compute_max_nnz_row_full(int n,
+                             int upper_nnz,
+                             const int *coo_rows,
+                             const int *coo_cols)
+{
+    int *row_counts = calloc(n, sizeof(int));
+    if (!row_counts)
+        return -1;
+
+    // iterate over the upper triangular elements in COO format
+    for (int k = 0; k < upper_nnz; ++k)
+    {
+        // Get the row and column indices of the current element
+        int i = coo_rows[k];
+        int j = coo_cols[k];
+
+        // Check if the element is in the upper triangular part
+        if (j <= i)
+        {
+            fprintf(stderr, "Error: non-upper entry row=%d, col=%d\n", i, j);
+            free(row_counts);
+            return -1;
+        }
+
+        // Increment the count for the row and its symmetric counterpart
+        row_counts[i]++;
+        row_counts[j]++;
+    }
+
+    int max = 0;
+    for (int i = 0; i < n; ++i)
+        if (row_counts[i] > max)
+            max = row_counts[i];
+
+    free(row_counts);
+    return max;
+}
+
+/*
     Analyze the ELL matrix structure, printing values, column indices, padding statistics.
 */
 void analyze_ell_matrix(int n, int nnz_max, double *ell_values, int *ell_col_idx)
@@ -349,8 +393,6 @@ void analyze_ell_matrix(int n, int nnz_max, double *ell_values, int *ell_col_idx
     printf("Percentage of rows with exactly 3 non-zero values: %.2f%%\n", percentage_rows_with_3);
 }
 
-#include <stdio.h>
-
 /*
     Analyze ELL (column-major) for symmetric matrix:
     - n        = number of rows
@@ -360,26 +402,29 @@ void analyze_ell_matrix(int n, int nnz_max, double *ell_values, int *ell_col_idx
 */
 void analyze_ell_matrix_colmajor(int n, int nnz_max,
                                  const double *ell_values,
-                                 const int    *ell_col_idx)
+                                 const int *ell_col_idx)
 {
-    int padding_count          = 0;
-    int mismatch_count         = 0;
-    int count_rows_with_1      = 0;
-    int count_rows_with_2      = 0;
-    int count_rows_with_3      = 0;
-    int count_rows_with_4      = 0;
-
+    int padding_count = 0;
+    int mismatch_count = 0;
+    int count_rows_with_1 = 0;
+    int count_rows_with_2 = 0;
+    int count_rows_with_3 = 0;
+    int count_rows_with_4 = 0;
 
     // --- Print values row by row ---
     printf("ELL values (row × slot):\n");
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < nnz_max; ++j) {
+    for (int i = 0; i < n; ++i)
+    {
+        for (int j = 0; j < nnz_max; ++j)
+        {
             int idx = j * n + i;
             double v = ell_values[idx];
             printf("%8.2f ", v);
-            if (v == 0.0) {
+            if (v == 0.0)
+            {
                 padding_count++;
-                if (ell_col_idx[idx] != -1) {
+                if (ell_col_idx[idx] != -1)
+                {
                     mismatch_count++;
                 }
             }
@@ -389,8 +434,10 @@ void analyze_ell_matrix_colmajor(int n, int nnz_max,
 
     // --- Print column-indices row by row ---
     printf("\nELL column indices (row × slot):\n");
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < nnz_max; ++j) {
+    for (int i = 0; i < n; ++i)
+    {
+        for (int j = 0; j < nnz_max; ++j)
+        {
             int idx = j * n + i;
             printf("%4d ", ell_col_idx[idx]);
         }
@@ -398,8 +445,8 @@ void analyze_ell_matrix_colmajor(int n, int nnz_max,
     }
 
     // --- General statistics ---
-    int total_slots    = n * nnz_max;
-    double padding_pct = 100.0 * padding_count  / total_slots;
+    int total_slots = n * nnz_max;
+    double padding_pct = 100.0 * padding_count / total_slots;
     double utilization = 100.0 * (total_slots - padding_count) / total_slots;
 
     printf("\nTotal slots: %d\n", total_slots);
@@ -412,14 +459,116 @@ void analyze_ell_matrix_colmajor(int n, int nnz_max,
         printf("Warning: %d padding entries have col_idx != -1.\n", mismatch_count);
 
     // --- Count rows by number of real non-zero entries ---
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; ++i)
+    {
         int real_count = 0;
-        for (int j = 0; j < nnz_max; ++j) {
+        for (int j = 0; j < nnz_max; ++j)
+        {
             int idx = j * n + i;
             if (ell_values[idx] != 0.0)
                 real_count++;
         }
-        if (real_count == 1)      count_rows_with_1++;
+        if (real_count == 1)
+            count_rows_with_1++;
+        else if (real_count == 2)
+            count_rows_with_2++;
+        else if (real_count == 3)
+            count_rows_with_3++;
+        else if (real_count == 4)
+            count_rows_with_4++;
+    }
+
+    double pct1 = 100.0 * count_rows_with_1 / n;
+    double pct2 = 100.0 * count_rows_with_2 / n;
+    double pct3 = 100.0 * count_rows_with_3 / n;
+    double pct4 = 100.0 * count_rows_with_4 / n;
+
+    printf("\nRows with exactly 1 non-zero: %d of %d (%.2f%%)\n",
+           count_rows_with_1, n, pct1);
+    printf("Rows with exactly 2 non-zeros: %d of %d (%.2f%%)\n",
+           count_rows_with_2, n, pct2);
+    printf("Rows with exactly 3 non-zeros: %d of %d (%.2f%%)\n",
+           count_rows_with_3, n, pct3);
+    printf("Rows with exactly 4 non-zeros: %d of %d (%.2f%%)\n",
+           count_rows_with_4, n, pct4);
+}
+
+/*
+    Analyze FULL-ELL (column-major) for symmetric matrix:
+    - n        = number of rows
+    - nnz_max  = max non-zeros per row (number of “slots”)
+    - ell_values[idx]  stores the value at slot j, row i via idx = j*n + i
+    - ell_col_idx[idx] stores the corresponding column index (or –1 if padding)
+    In the FULL-ELL format all off-diagonals (i,j) and (j,i) are explicitly stored,
+    so here we just accumulate y[i] += v*x[col] (no check col>i).
+*/
+void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
+                                      const double *ell_values,
+                                      const int    *ell_col_idx)
+{
+    int padding_count        = 0;
+    int mismatch_count       = 0;
+    int count_rows_with_1    = 0;
+    int count_rows_with_2    = 0;
+    int count_rows_with_3    = 0;
+    int count_rows_with_4    = 0;
+
+    // --- Print values row by row ---
+    printf("ELL-FULL values (row × slot):\n");
+    for (int i = 0; i < n; ++i)
+    {
+        for (int j = 0; j < nnz_max; ++j)
+        {
+            int idx = j * n + i;
+            double v = ell_values[idx];
+            printf("%8.2f ", v);
+            if (v == 0.0)
+            {
+                padding_count++;
+                if (ell_col_idx[idx] != -1)
+                    mismatch_count++;
+            }
+        }
+        printf("\n");
+    }
+
+    // --- Print column-indices row by row ---
+    printf("\nELL-FULL column indices (row × slot):\n");
+    for (int i = 0; i < n; ++i)
+    {
+        for (int j = 0; j < nnz_max; ++j)
+        {
+            int idx = j * n + i;
+            printf("%4d ", ell_col_idx[idx]);
+        }
+        printf("\n");
+    }
+
+    // --- General statistics ---
+    int total_slots      = n * nnz_max;
+    double padding_pct   = 100.0 * padding_count  / total_slots;
+    double utilization   = 100.0 * (total_slots - padding_count) / total_slots;
+
+    printf("\nTotal slots: %d\n", total_slots);
+    printf("Padding count: %d\n", padding_count);
+    printf("Padding percentage: %.2f%%\n", padding_pct);
+    printf("Memory utilization: %.2f%%\n", utilization);
+    if (mismatch_count == 0)
+        printf("All zero values correctly marked with column index -1.\n");
+    else
+        printf("Warning: %d padding entries have col_idx != -1.\n", mismatch_count);
+
+    // --- Count rows by number of real non-zero entries ---
+    for (int i = 0; i < n; ++i)
+    {
+        int real_count = 0;
+        for (int j = 0; j < nnz_max; ++j)
+        {
+            int idx = j * n + i;
+            if (ell_values[idx] != 0.0)
+                real_count++;
+        }
+        if      (real_count == 1) count_rows_with_1++;
         else if (real_count == 2) count_rows_with_2++;
         else if (real_count == 3) count_rows_with_3++;
         else if (real_count == 4) count_rows_with_4++;
@@ -510,6 +659,88 @@ void coo_to_ell_symmetric_upper_colmajor(int n,                    // dimension 
 }
 
 /*
+    COO -> ELL conversion for symmetric matrix: full (upper+lower) off-diagonals,
+    diagonal kept external. Stored in COLUMN-MAJOR order.
+    Inputs:
+      - n                : dimension of A (n×n)
+      - upper_nnz        : number of COO entries (strictly upper triangular)
+      - coo_values_upper : values of strictly upper part
+      - coo_rows, coo_cols: row/col indices of strictly upper part
+      - max_nnz_row      : maximum non-zeros per row in the full matrix (off-diag only)
+    Outputs (size = n * max_nnz_row):
+      - ell_values
+      - ell_cols         : column indices, -1 for padding
+*/
+void coo_to_ell_symmetric_full_colmajor(int n,
+                                        int upper_nnz,
+                                        double *coo_values_upper,
+                                        int *coo_rows,
+                                        int *coo_cols,
+                                        double *ell_values,
+                                        int *ell_cols,
+                                        int max_nnz_row)
+{
+    // 1) allocate and zero count of entries per row
+    int *current_count = (int *)calloc(n, sizeof(int));
+    if (!current_count)
+    {
+        fprintf(stderr, "Error: calloc failed\n");
+        return;
+    }
+
+    // 2) init ELL arrays: values=0, cols=-1
+    memset(ell_values, 0, n * max_nnz_row * sizeof(double));
+
+    for (int k = 0; k < n * max_nnz_row; ++k)
+        ell_cols[k] = -1;
+
+    // 3) scatter each upper-offdiag entry twice: (row→col) and (col→row)
+    for (int k = 0; k < upper_nnz; ++k)
+    {
+        // saves indexes and value of the current upper triangular element from COO format
+        int i = coo_rows[k];
+        int j = coo_cols[k];
+        double v = coo_values_upper[k];
+
+        // sanity check (check if the element is in the upper triangular part)
+        if (j <= i)
+        {
+            printf("Error: non-upper COO entry row=%d, col=%d\n", i, j);
+            free(current_count);
+            return;
+        }
+
+        // -- place A[i][j] into row i --
+        int slot_i = current_count[i]++; // get the current slot for row i and increment it
+
+        // check if we have exceeded the maximum number of non-zeros per row
+        if (slot_i >= max_nnz_row)
+        {
+            printf("Error: row %d has >%d off-diag entries\n", i, max_nnz_row);
+            free(current_count);
+            return;
+        }
+
+        // column-major index for slot_i, row i
+        ell_values[slot_i * n + i] = v;
+        ell_cols[slot_i * n + i] = j;
+
+        // -- place A[j][i] into row j (symmetric) --
+        int slot_j = current_count[j]++;
+        if (slot_j >= max_nnz_row)
+        {
+            printf("Error: row %d has >%d off-diag entries\n", j, max_nnz_row);
+            free(current_count);
+            return;
+        }
+        ell_values[slot_j * n + j] = v;
+        ell_cols[slot_j * n + j] = i;
+    }
+
+    free(current_count);
+}
+
+/*
     MatVec for symmetric matrix in ELL format (upper triangular only + full diagonal stored separately)
     Stored in COLUMN-MAJOR order.
 */
@@ -531,8 +762,11 @@ void mv_ell_symmetric_upper_colmajor(int n,              // dimension of matrix 
     // 2) diagonal contribution
     for (int i = 0; i < n; ++i)
     {
-        y[i] = y[i] + diag[i] * x[i];
+        // usare +=
+        y[i] = y[i] + diag[i] * x[i]; // ! to vectorize , vector vector element wise multiplication and accumulate (y = y + x * z)
     }
+
+    // ! Per vettorizzare, usare matrice mergiata unica
 
     // 3) for each "slot" j in ELL (column-major)
     for (int j = 0; j < max_nnz_row; ++j)
@@ -551,16 +785,57 @@ void mv_ell_symmetric_upper_colmajor(int n,              // dimension of matrix 
             }
             if (col <= i)
             {
-                // non-upper entry found → error
+                // non-upper entry found -> error
                 printf("Error: non-upper element at row=%d, col=%d\n", i, col);
                 return;
             }
 
             double v = ell_values[offset]; // extract value of the current element
             // accumulate contribution for row i
-            y[i] = y[i] + v * x[col];
+            y[i] = y[i] + v * x[col]; // ! axpy = y = y + alpha * x
             // symmetric contribution for row col
-            y[col] = y[col] + v * x[i];
+            y[col] = y[col] + v * x[i]; // ! axpy = y = y + alpha * x
+        }
+    }
+}
+
+/*
+    MatVec for generic matrix with external diag, in col major order. 
+*/
+void mv_ell_symmetric_full_colmajor(int n,              
+                                    int max_nnz_row,    // max number of off-diagonal nnz in rows 
+                                    double *diag,       
+                                    double *ell_values, // ELL values (size n * max_nnz_row)
+                                    int *ell_cols,      // ELL column indices (size n * max_nnz_row)
+                                    double *x,          // input vector 
+                                    double *y)          // output vector 
+{
+    // 1) initialize y at zero 
+    memset(y, 0, n * sizeof(double));
+    
+    // 2) diagonal contributes (element wise product + accumulate)
+    for (int i = 0; i < n; ++i)
+    {
+        y[i] += diag[i] * x[i];
+    }
+
+    // 3) non-diagonal contributes 
+    // iterate all slots (ELL columns)
+    for (int j = 0; j < max_nnz_row; ++j)
+    {
+        // iterate all elements in a slot
+        for (int i = 0; i < n; ++i)
+        {
+            int offset = j * n + i; // column-major offset
+
+            int col = ell_cols[offset];
+
+            // do not accumulate if we are on a 0 padded element
+            if (col == -1) // padding
+                continue;
+
+            // off-diagonal contribute 
+            y[i] += ell_values[offset] * x[col];
         }
     }
 }
