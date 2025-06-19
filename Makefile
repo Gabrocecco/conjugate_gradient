@@ -47,6 +47,27 @@ mm_read: $(BUILD_DIR) src/mm_read.c src/mmio.c
 		-o $(BUILD_DIR)/mm_read src/mm_read.c src/mmio.c -lm
 
 
+# === Test vectorized CG on RISC-V and run under Spike ===
+
+test_cg_vec: $(BUILD_DIR)
+	riscv64-unknown-elf-gcc -O0 -march=rv64gcv -mabi=lp64d \
+		-std=c99 -Wall -pedantic -Iinclude \
+		-o $(BUILD_DIR)/test_cg_vec \
+		src/vectorized.c \
+		src/cg_vec.c \
+		src/vec.c \
+		src/coo.c \
+		src/csr.c \
+		src/ell.c \
+		src/utils.c \
+		src/parser.c \
+		tests/test_cg_vec.c \
+		-lm
+
+run_test_cg_vec: test_cg_vec
+	spike --isa=rv64gcv pk $(BUILD_DIR)/test_cg_vec
+
+
 # === Build directory ===
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
