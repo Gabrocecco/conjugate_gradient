@@ -5,6 +5,30 @@
 <img src="media/cylinder.png" width="400">
 </p>
 
+Run CG (x86) using a sample [problem](https://www.openfoam.com/documentation/tutorial-guide/2-incompressible-flow/2.2-flow-around-a-cylinder) from OpenFOAM:
+
+```text
+make test_cg
+./build/test_cg  
+```
+
+Run vectorized CG in [Spyke](https://github.com/riscv-software-src/riscv-isa-sim) RISC-V simulator:
+```
+make run_test_cg_vec
+```
+
+Supported matrix formats: 
+```text
+- [x] COO
+- [x] CSR
+- [x] ELL 
+- [] SELL
+```
+
+Vectorized kernels: 
+- Matrix Vector product in ELL format [src/vectorized.c](src/vectorized.c) 
+
+
 ```text
 conjugate_gradient/
 ├── include/        # Header files (.h)
@@ -19,17 +43,3 @@ conjugate_gradient/
 ├── Makefile        
 └── README.md       
 ```
-Run CG using a sample problem from OpenFOAM:
-```
-make test_cg
-./build/test_cg  
-```
-
-Supported matrix formats: 
-```text
-- [x] COO
-- [x] CSR
-- [x] ELL 
-- [] SELL
-```
-
