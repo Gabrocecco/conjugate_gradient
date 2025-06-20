@@ -1,6 +1,38 @@
 #ifndef ELL_H
 #define ELL_H
 
+#include <stdint.h> 
+#include <stddef.h>
+
+void print_dense_matrix(double **A, int n);
+
+void convert_ell_to_dense(int n, double *diag, double *ell_values, int *ell_cols, int max_nnz_row, double **A);
+
+void convert_ell_to_dense_colmajor(int n, double *diag, double *ell_values, int *ell_cols, int max_nnz_row, double **A);
+
+void convert_ell_full_to_dense_rowmajor(int n,
+                                        const double diag[],
+                                        const double ell_values[],
+                                        const int ell_cols[],
+                                        int max_nnz_row,
+                                        double **A);
+
+void convert_ell_full_to_dense_colmajor(int n,
+                                        const double diag[],
+                                        const double ell_values[],
+                                        const int ell_cols[],
+                                        int max_nnz_row,
+                                        double **A);
+
+void coo_to_ell_symmetric_full_colmajor_sdtint(int n,
+                                               int upper_nnz,
+                                               double *coo_values_upper,
+                                               int *coo_rows,
+                                               int *coo_cols,
+                                               double *ell_values,
+                                               uint64_t *ell_cols,
+                                               int max_nnz_row);
+
 // Generic CSR to ELLPACK conversion
 void csr_to_ell_generic(int n, int nnz,
                         double *csr_values,
@@ -117,6 +149,14 @@ void mv_ell_symmetric_full_colmajor(int n,              // dimension of matrix A
                                     double *y           // output vector (size n)
 );
 
+void mv_ell_symmetric_full_colmajor_sdtint(int n,
+                                           int max_nnz_row, // max number of off-diagonal nnz in rows
+                                           double *diag,
+                                           double *ell_values, // ELL values (size n * max_nnz_row)
+                                           uint64_t *ell_cols, // ELL column indices (size n * max_nnz_row)
+                                           double *x,          // input vector
+                                           double *y);         // output vector
+
 void analyze_ell_matrix_colmajor(int n, int nnz_max,
                                  const double *ell_values,
                                  const int *ell_col_idx);
@@ -124,4 +164,5 @@ void analyze_ell_matrix_colmajor(int n, int nnz_max,
 void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
                                       const double *ell_values,
                                       const int *ell_col_idx);
+
 #endif // ELLPACK_H

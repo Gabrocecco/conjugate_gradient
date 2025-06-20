@@ -1,7 +1,15 @@
+
+# x86 compilation  
 CC=gcc
 CFLAGS=-std=c99 -Wall -pedantic -Iinclude	# -Iinclude searches for header filers in /include
 DEBUG_FLAGS=-O0 -g -fsanitize=address,undefined 
 OPT_FLAGS=-O3 -DNDEBUG -march=native -mtune=native
+
+# spike compilation  
+RISCV_CC     := riscv64-unknown-elf-gcc
+RISCV_FLAGS  := -O0 -march=rv64gcv -mabi=lp64d
+
+SPIKERUN     := spike --isa=rv64gcv pk
 
 BUILD_DIR=build
 
@@ -47,13 +55,27 @@ mm_read: $(BUILD_DIR) src/mm_read.c src/mmio.c
 		-o $(BUILD_DIR)/mm_read src/mm_read.c src/mmio.c -lm
 
 
+# === Test vectorized matrix vector product in ell format on RISC-V and run under Spike ===
+
+test_vec: $(BUILD_DIR)
+	$(RISCV_CC) $(RISCV_FLAGS) $(CFLAGS) \
+		-o $(BUILD_DIR)/test_vec \
+		src/vectorized.c \
+		src/ell.c \
+		src/common.c \
+		tests/test_vec.c
+
+run_test_vec: test_vec 
+			$(SPIKERUN) $(BUILD_DIR)/test_vec
+
 # === Test vectorized CG on RISC-V and run under Spike ===
 
 test_cg_vec: $(BUILD_DIR)
-	riscv64-unknown-elf-gcc -O0 -march=rv64gcv -mabi=lp64d \
-		-std=c99 -Wall -pedantic -Iinclude \
+	$(RISCV_CC) $(RISCV_FLAGS) $(CFLAGS) \
+		$(CFLAGS) \
 		-o $(BUILD_DIR)/test_cg_vec \
 		src/vectorized.c \
+		src/common.c \
 		src/cg_vec.c \
 		src/vec.c \
 		src/coo.c \

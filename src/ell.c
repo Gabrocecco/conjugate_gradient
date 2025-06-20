@@ -1,11 +1,137 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include "ell.h"
 
 /*
     MatVec prodcut for generic matrix A (nxx) in ELL format.    TO-DO: test this function
 */
+
+void print_dense_matrix(double **A, int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 0; j < n; j++)
+            printf("%6.1f ", A[i][j]);
+        printf("\n");
+    }
+}
+
+void convert_ell_to_dense(int n, double *diag, double *ell_values, int *ell_cols, int max_nnz_row, double **A)
+{
+    for (int i = 0; i < n; i++)
+    {
+        A[i][i] = diag[i];
+        for (int k = 0; k < max_nnz_row; k++)
+        {
+            int col = ell_cols[i * max_nnz_row + k];
+            double val = ell_values[i * max_nnz_row + k];
+            if (col != -1)
+            {
+                A[i][col] = val;
+                A[col][i] = val; // symmetric
+            }
+        }
+    }
+}
+
+void convert_ell_to_dense_colmajor(int n, double *diag, double *ell_values, int *ell_cols, int max_nnz_row, double **A)
+{
+    for (int i = 0; i < n; i++)
+    {
+        A[i][i] = diag[i];
+        for (int k = 0; k < max_nnz_row; k++)
+        {
+            int col = ell_cols[k * n + i];
+            double val = ell_values[k * n + i];
+            if (col != -1)
+            {
+                A[i][col] = val;
+                A[col][i] = val; // symmetric
+            }
+        }
+    }
+}
+
+/*
+    Convert full-ELL (row-major) → dense
+    - n              : dimensione matrice
+    - diag[i]        : diagonale A[i][i]
+    - ell_values     : off-diagonali, size = n*max_nnz_row, layout row-major (i*max_nnz_row + k)
+    - ell_cols       : colonne corrispondenti, -1 per padding
+    - max_nnz_row    : numero slot per riga
+    - A              : puntatore a vettore di puntatori (A[i][j])
+*/
+void convert_ell_full_to_dense_rowmajor(int n,
+                                        const double diag[],
+                                        const double ell_values[],
+                                        const int ell_cols[],
+                                        int max_nnz_row,
+                                        double **A)
+{
+    // 0) azzera tutta la matrice
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j)
+            A[i][j] = 0.0;
+
+    // 1) inserisci la diagonale
+    for (int i = 0; i < n; ++i)
+        A[i][i] = diag[i];
+
+    // 2) inserisci ogni slot off-diagonale
+    for (int i = 0; i < n; ++i)
+    {
+        for (int k = 0; k < max_nnz_row; ++k)
+        {
+            int idx = i * max_nnz_row + k;
+            int col = ell_cols[idx];
+            if (col == -1)
+                continue; // padding → skip
+
+            double v = ell_values[idx];
+            A[i][col] = v; // A[i][j]
+            A[col][i] = v; // simmetrico A[j][i]
+        }
+    }
+}
+
+/*
+    Convert full-ELL (column-major) → dense
+    - ell_values / ell_cols layout: slot-major (k*n + i)
+*/
+void convert_ell_full_to_dense_colmajor(int n,
+                                        const double diag[],
+                                        const double ell_values[],
+                                        const int ell_cols[],
+                                        int max_nnz_row,
+                                        double **A)
+{
+    // 0) azzera tutta la matrice
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j)
+            A[i][j] = 0.0;
+
+    // 1) inserisci la diagonale
+    for (int i = 0; i < n; ++i)
+        A[i][i] = diag[i];
+
+    // 2) inserisci ogni slot off-diagonale
+    for (int k = 0; k < max_nnz_row; ++k)
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            int idx = k * n + i;
+            int col = ell_cols[idx];
+            if (col == -1)
+                continue; // padding → skip
+
+            double v = ell_values[idx];
+            A[i][col] = v; // A[i][j]
+            A[col][i] = v; // simmetrico A[j][i]
+        }
+    }
+}
 
 void mv_ell(int n,              // dimension of matrix A (n x n)
             int max_nnz_row,    // maximum number of non-zeros per row in ELL format
@@ -504,14 +630,14 @@ void analyze_ell_matrix_colmajor(int n, int nnz_max,
 */
 void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
                                       const double *ell_values,
-                                      const int    *ell_col_idx)
+                                      const int *ell_col_idx)
 {
-    int padding_count        = 0;
-    int mismatch_count       = 0;
-    int count_rows_with_1    = 0;
-    int count_rows_with_2    = 0;
-    int count_rows_with_3    = 0;
-    int count_rows_with_4    = 0;
+    int padding_count = 0;
+    int mismatch_count = 0;
+    int count_rows_with_1 = 0;
+    int count_rows_with_2 = 0;
+    int count_rows_with_3 = 0;
+    int count_rows_with_4 = 0;
 
     // --- Print values row by row ---
     printf("ELL-FULL values (row × slot):\n");
@@ -545,9 +671,9 @@ void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
     }
 
     // --- General statistics ---
-    int total_slots      = n * nnz_max;
-    double padding_pct   = 100.0 * padding_count  / total_slots;
-    double utilization   = 100.0 * (total_slots - padding_count) / total_slots;
+    int total_slots = n * nnz_max;
+    double padding_pct = 100.0 * padding_count / total_slots;
+    double utilization = 100.0 * (total_slots - padding_count) / total_slots;
 
     printf("\nTotal slots: %d\n", total_slots);
     printf("Padding count: %d\n", padding_count);
@@ -568,10 +694,14 @@ void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
             if (ell_values[idx] != 0.0)
                 real_count++;
         }
-        if      (real_count == 1) count_rows_with_1++;
-        else if (real_count == 2) count_rows_with_2++;
-        else if (real_count == 3) count_rows_with_3++;
-        else if (real_count == 4) count_rows_with_4++;
+        if (real_count == 1)
+            count_rows_with_1++;
+        else if (real_count == 2)
+            count_rows_with_2++;
+        else if (real_count == 3)
+            count_rows_with_3++;
+        else if (real_count == 4)
+            count_rows_with_4++;
     }
 
     double pct1 = 100.0 * count_rows_with_1 / n;
@@ -588,7 +718,6 @@ void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
     printf("Rows with exactly 4 non-zeros: %d of %d (%.2f%%)\n",
            count_rows_with_4, n, pct4);
 }
-
 
 /*
     COO -> ELL conversion for symmetric matrix: upper triangular part only
@@ -671,7 +800,7 @@ void coo_to_ell_symmetric_upper_colmajor(int n,                    // dimension 
       - ell_values
       - ell_cols         : column indices, -1 for padding
 */
-void coo_to_ell_symmetric_full_colmajor(int n,
+void coo_to_ell_symmetric_full_colmajor(int n,                      
                                         int upper_nnz,
                                         double *coo_values_upper,
                                         int *coo_rows,
@@ -694,7 +823,7 @@ void coo_to_ell_symmetric_full_colmajor(int n,
     for (int k = 0; k < n * max_nnz_row; ++k)
         ell_cols[k] = -1;
 
-    // 3) scatter each upper-offdiag entry twice: (row→col) and (col→row)
+    // 3) scatter each upper-offdiag entry twice: (row -> col) and (col -> row)
     for (int k = 0; k < upper_nnz; ++k)
     {
         // saves indexes and value of the current upper triangular element from COO format
@@ -735,6 +864,88 @@ void coo_to_ell_symmetric_full_colmajor(int n,
         }
         ell_values[slot_j * n + j] = v;
         ell_cols[slot_j * n + j] = i;
+    }
+
+    free(current_count);
+}
+
+/*
+    COO -> ELL conversion for symmetric matrix: full (upper+lower) off-diagonals,
+    diagonal kept external. Stored in COLUMN-MAJOR order.
+    Inputs:
+      - n                : dimension of A (n×n)
+      - upper_nnz        : number of COO entries (strictly upper triangular)
+      - coo_values_upper : values of strictly upper part
+      - coo_rows, coo_cols: row/col indices of strictly upper part
+      - max_nnz_row      : maximum non-zeros per row in the full matrix (off-diag only)
+    Outputs (size = n * max_nnz_row):
+      - ell_values
+      - ell_cols         : column indices, -1 for padding
+*/
+void coo_to_ell_symmetric_full_colmajor_sdtint(int n,
+                                               int upper_nnz,
+                                               double *coo_values_upper,
+                                               int *coo_rows,
+                                               int *coo_cols,
+                                               double *ell_values,
+                                               uint64_t *ell_cols,
+                                               int max_nnz_row)
+{
+    // 1) allocate and zero count of entries per row
+    int *current_count = (int *)calloc(n, sizeof(int));
+    if (!current_count)
+    {
+        fprintf(stderr, "Error: calloc failed\n");
+        return;
+    }
+
+    // 2) init ELL arrays: values=0, cols=-1
+    memset(ell_values, 0, n * max_nnz_row * sizeof(double));
+
+    for (int k = 0; k < n * max_nnz_row; ++k)
+        ell_cols[k] = (uint64_t)-1;
+
+    // 3) scatter each upper-offdiag entry twice: (row→col) and (col→row)
+    for (int k = 0; k < upper_nnz; ++k)
+    {
+        // saves indexes and value of the current upper triangular element from COO format
+        int i = coo_rows[k];
+        int j = coo_cols[k];
+        double v = coo_values_upper[k];
+
+        // sanity check (check if the element is in the upper triangular part)
+        if (j <= i)
+        {
+            printf("Error: non-upper COO entry row=%d, col=%d\n", i, j);
+            free(current_count);
+            return;
+        }
+
+        // -- place A[i][j] into row i --
+        int slot_i = current_count[i]++; // get the current slot for row i and increment it
+
+        // check if we have exceeded the maximum number of non-zeros per row
+        if (slot_i >= max_nnz_row)
+        {
+            printf("Error: row %d has >%d off-diag entries\n", i, max_nnz_row);
+            free(current_count);
+            return;
+        }
+
+        // column-major index for slot_i, row i
+        ell_values[slot_i * n + i] = v;
+        ell_cols[slot_i * n + i] = (uint64_t)j;
+
+        // -- place A[j][i] into row j (symmetric) --
+        int slot_j = current_count[j]++;
+        if (slot_j >= max_nnz_row)
+        {
+            printf("Error: row %d has >%d off-diag entries\n", j, max_nnz_row);
+            free(current_count);
+            return;
+        }
+        ell_values[slot_j * n + j] = v;
+        ell_cols[slot_j * n + j] = (uint64_t)i;
     }
 
     free(current_count);
@@ -800,26 +1011,26 @@ void mv_ell_symmetric_upper_colmajor(int n,              // dimension of matrix 
 }
 
 /*
-    MatVec for generic matrix with external diag, in col major order. 
+    MatVec for generic matrix with external diag, in col major order.
 */
-void mv_ell_symmetric_full_colmajor(int n,              
-                                    int max_nnz_row,    // max number of off-diagonal nnz in rows 
-                                    double *diag,       
+void mv_ell_symmetric_full_colmajor(int n,
+                                    int max_nnz_row, // max number of off-diagonal nnz in rows
+                                    double *diag,
                                     double *ell_values, // ELL values (size n * max_nnz_row)
                                     int *ell_cols,      // ELL column indices (size n * max_nnz_row)
-                                    double *x,          // input vector 
-                                    double *y)          // output vector 
+                                    double *x,          // input vector
+                                    double *y)          // output vector
 {
-    // 1) initialize y at zero 
+    // 1) initialize y at zero
     memset(y, 0, n * sizeof(double));
-    
+
     // 2) diagonal contributes (element wise product + accumulate)
     for (int i = 0; i < n; ++i)
     {
         y[i] += diag[i] * x[i];
     }
 
-    // 3) non-diagonal contributes 
+    // 3) non-diagonal contributes
     // iterate all slots (ELL columns)
     for (int j = 0; j < max_nnz_row; ++j)
     {
@@ -834,7 +1045,48 @@ void mv_ell_symmetric_full_colmajor(int n,
             if (col == -1) // padding
                 continue;
 
-            // off-diagonal contribute 
+            // off-diagonal contribute
+            y[i] += ell_values[offset] * x[col];
+        }
+    }
+}
+
+/*
+    MatVec for generic matrix with external diag, in col major order.
+*/
+void mv_ell_symmetric_full_colmajor_sdtint(int n,
+                                           int max_nnz_row, // max number of off-diagonal nnz in rows
+                                           double *diag,
+                                           double *ell_values, // ELL values (size n * max_nnz_row)
+                                           uint64_t *ell_cols, // ELL column indices (size n * max_nnz_row)
+                                           double *x,          // input vector
+                                           double *y)          // output vector
+{
+    // 1) initialize y at zero
+    memset(y, 0, n * sizeof(double));
+
+    // 2) diagonal contributes (element wise product + accumulate)
+    for (int i = 0; i < n; ++i)
+    {
+        y[i] += diag[i] * x[i];
+    }
+
+    // 3) non-diagonal contributes
+    // iterate all slots (ELL columns)
+    for (int j = 0; j < max_nnz_row; ++j)
+    {
+        // iterate all elements in a slot
+        for (int i = 0; i < n; ++i)
+        {
+            int offset = j * n + i; // column-major offset
+
+            int col = ell_cols[offset];
+
+            // do not accumulate if we are on a 0 padded element
+            if (col == -1) // padding
+                continue;
+
+            // off-diagonal contribute
             y[i] += ell_values[offset] * x[col];
         }
     }

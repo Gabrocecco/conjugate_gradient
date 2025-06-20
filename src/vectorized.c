@@ -10,13 +10,352 @@ riscv64-unknown-elf-gcc   -O0 -march=rv64gcv -mabi=lp64d   -std=c99 -Wall -pedan
 spike --isa=rv64gcv pk build/test_cg_vec
 */
 
-void mv_ell_symmetric_full_colmajor_vector(int n,               // A matrix dimension (n x n)
-                                           int max_nnz_row,     // max number of off-diagonal nnz in rows
-                                           double *diag,        // dense diangonal 
-                                           double *ell_values,  // ELL values (size n * max_nnz_row)
-                                           uint64_t *ell_cols,  // ELL column indices (size n * max_nnz_row)
-                                           double *x,           // input vector
-                                           double *y)           // output vector
+void mv_ell_symmetric_full_colmajor_vector(int n,              // A matrix dimension (n x n)
+                                           int max_nnz_row,    // max number of off-diagonal nnz in rows
+                                           double *diag,       // dense diangonal
+                                           double *ell_values, // ELL values (size n * max_nnz_row)
+                                           uint64_t *ell_cols, // ELL column indices (size n * max_nnz_row)
+                                           double *x,          // input vector
+                                           double *y)          // output vector
+{
+    // 1) initialize y at zero
+    memset(y, 0, n * sizeof(double));
+
+    size_t vl;
+    for (size_t i = 0; i < n; i += vl)
+    {
+        int remaining = n - i; // remaining elements to process
+        // vl = max(vlmax, remaining);
+        vl = __riscv_vsetvl_e64m1(remaining); // set vector length to the number of elements left to process (max vlmax)
+
+        // load diag[i] and x[i] into vector registers
+        vfloat64m1_t vdiag = __riscv_vle64_v_f64m1(&diag[i], vl); // vdiag[i] = diag[i], vx[i] = x[i]
+        // load x[i] into vector register
+        vfloat64m1_t vx = __riscv_vle64_v_f64m1(&x[i], vl); // vx[i] = x[i]
+        // load y[i] into vector register
+        vfloat64m1_t vy = __riscv_vle64_v_f64m1(&y[i], vl); // should be zero, but safe, vy[i] = y[i]
+
+        // perform element-wise multiplication and accumulate
+        vy = __riscv_vfmacc_vv_f64m1(vy, vdiag, vx, vl); // y[i] += diag[i] * x[i]
+
+        // store result back to y[i]
+        __riscv_vse64_v_f64m1(&y[i], vy, vl); // y[i] = vy
+    }
+
+    for (int slot = 0; slot < max_nnz_row; ++slot) // ierate slots (ELL columns) (max_nnz_row slots)
+    {
+        for (int j = 0; j < n; j += vl) // iterate elements in a slot (n elements for each slot)
+        {
+            int remaining = n - j; // remaining elements to process
+
+            // take max from vlmax and remaining, takes care of tail
+            // vl = max(vlmax, remaining);
+            vl = __riscv_vsetvl_e64m1(remaining);
+
+            // compute offset for accessing ell_values[] and ell_cols[],
+            // each slot is n elements long and we are in the j-th element of this slot.
+            size_t base_offset = slot * n + j;
+
+            // 1. Load vl values from ell_values[] array starting from offset, no gather needed
+            vfloat64m1_t vvals = __riscv_vle64_v_f64m1(&ell_values[base_offset], vl);
+
+            // 2. Load vl column indices from ell_cols[] array starting from offset, no gather needed
+            vuint64m1_t vcol_idx = __riscv_vle64_v_u64m1(&ell_cols[base_offset], vl);
+
+            // scale by 8 indeces stored in vcol_idx, we need this because the gather wants the indeces in bytes positions
+            // each double is 8 bytes, so we scale indeces by 8
+            // from vcol_idx = [2, 4] -> scaled_idx = [128, 512]
+            vuint64m1_t scaled_idx = __riscv_vmul_vx_u64m1(vcol_idx, 8, vl);
+
+            // 3. Build mask for patting (col == -1), 1 if valid, 0 if padding
+            // vcol_idx = [5, -1] -> mask = [1, 0]
+            vbool64_t mask = __riscv_vmsne_vx_u64m1_b64(vcol_idx,     // input vector
+                                                        (uint64_t)-1, // where to mask
+                                                        vl);
+
+            /* 4. gather from x[col] with index vector vcol_idx
+             masked gather from x[col] with index vector vcol_idx, leave NaN's in unmasked positions
+                   x = [4,  2]
+            vcol_idx = [2, -1]    --------gather------> vx = [4, NaN]
+                mask = [1,  0]
+            */
+            vfloat64m1_t vx = __riscv_vluxei64_v_f64m1_m(mask,       // mask
+                                                         x,          // input vector
+                                                         scaled_idx, // indices
+                                                         vl);
+
+            // 5. Load vl contiguous elements of y, no gather needed
+            vfloat64m1_t vy = __riscv_vle64_v_f64m1(&y[j], vl);
+
+            // 6. vy += vvals * vx with masking, (masked FMA)
+            // in masked position we dont do anything, we leave old y[i] values
+            //       vx = [4,   2]
+            //    vvals = [7,   0]   --------FMA------> vy = [10 + 4*7, 20]
+            //       vy = [10, 20]                                       |
+            //                                                        (masked)
+            // vcol_idx = [2,  -1]
+            //     mask = [1,   0]
+            vy = __riscv_vfmacc_vv_f64m1_m(mask,  // mask
+                                           vy,    // output vector where to accumulate
+                                           vvals, // first input vector
+                                           vx,    // second input vector
+                                           vl);
+
+            // 7. Write vy back to y
+            __riscv_vse64_v_f64m1(&y[j], // destintion, where to write
+                                  vy,    // input, what to write
+                                  vl);
+        }
+    }
+}
+
+void mv_ell_symmetric_full_colmajor_vector_m2(int n,              // A matrix dimension (n x n)
+                                              int max_nnz_row,    // max number of off-diagonal nnz in rows
+                                              double *diag,       // dense diangonal
+                                              double *ell_values, // ELL values (size n * max_nnz_row)
+                                              uint64_t *ell_cols, // ELL column indices (size n * max_nnz_row)
+                                              double *x,          // input vector
+                                              double *y)          // output vector
+{
+    // 1) initialize y at zero
+    memset(y, 0, n * sizeof(double));
+
+    size_t vl;
+    for (size_t i = 0; i < n; i += vl)
+    {
+        int remaining = n - i; // remaining elements to process
+        // vl = max(vlmax, remaining);
+        vl = __riscv_vsetvl_e64m2(remaining); // set vector length to the number of elements left to process (max vlmax)
+
+        // load diag[i] and x[i] into vector registers
+        vfloat64m2_t vdiag = __riscv_vle64_v_f64m2(&diag[i], vl); // vdiag[i] = diag[i], vx[i] = x[i]
+        // load x[i] into vector register
+        vfloat64m2_t vx = __riscv_vle64_v_f64m2(&x[i], vl); // vx[i] = x[i]
+        // load y[i] into vector register
+        vfloat64m2_t vy = __riscv_vle64_v_f64m2(&y[i], vl); // should be zero, but safe, vy[i] = y[i]
+
+        // perform element-wise multiplication and accumulate
+        vy = __riscv_vfmacc_vv_f64m2(vy, vdiag, vx, vl); // y[i] += diag[i] * x[i]
+
+        // store result back to y[i]
+        __riscv_vse64_v_f64m2(&y[i], vy, vl); // y[i] = vy
+    }
+
+    for (int slot = 0; slot < max_nnz_row; ++slot) // ierate slots (ELL columns) (max_nnz_row slots)
+    {
+        for (int j = 0; j < n; j += vl) // iterate elements in a slot (n elements for each slot)
+        {
+            int remaining = n - j; // remaining elements to process
+
+            // take max from vlmax and remaining, takes care of tail
+            // vl = max(vlmax, remaining);
+            vl = __riscv_vsetvl_e64m2(remaining);
+
+            // compute offset for accessing ell_values[] and ell_cols[],
+            // each slot is n elements long and we are in the j-th element of this slot.
+            size_t base_offset = slot * n + j;
+
+            // 1. Load vl values from ell_values[] array starting from offset, no gather needed
+            vfloat64m2_t vvals = __riscv_vle64_v_f64m2(&ell_values[base_offset], vl);
+
+            // 2. Load vl column indices from ell_cols[] array starting from offset, no gather needed
+            vuint64m2_t vcol_idx = __riscv_vle64_v_u64m2(&ell_cols[base_offset], vl);
+
+            // scale by 8 indeces stored in vcol_idx, we need this because the gather wants the indeces in bytes positions
+            // each double is 8 bytes, so we scale indeces by 8
+            // from vcol_idx = [2, 4] -> scaled_idx = [128, 512]
+            vuint64m2_t scaled_idx = __riscv_vmul_vx_u64m2(vcol_idx, 8, vl);
+
+            // 3. Build mask for patting (col == -1), 1 if valid, 0 if padding
+            // vcol_idx = [5, -1] -> mask = [1, 0]
+            // vbool64_t mask = __riscv_vmsne_vx_u64m1_b64(vcol_idx,       // input vector
+            //                                             (uint64_t)-1,   // where to mask
+            //                                             vl);
+            /*  m1 -> vbool64_t
+
+                m2 -> vbool32_t
+
+                m4 -> vbool16_t*/
+            vbool32_t mask = __riscv_vmsne_vx_u64m2_b32(vcol_idx, (uint64_t)-1, vl);
+
+            /* 4. gather from x[col] with index vector vcol_idx
+             masked gather from x[col] with index vector vcol_idx, leave NaN's in unmasked positions
+                   x = [4,  2]
+            vcol_idx = [2, -1]    --------gather------> vx = [4, NaN]
+                mask = [1,  0]
+            */
+            vfloat64m2_t vx = __riscv_vluxei64_v_f64m2_m(mask,       // mask
+                                                         x,          // input vector
+                                                         scaled_idx, // indices
+                                                         vl);
+
+            // 5. Load vl contiguous elements of y, no gather needed
+            vfloat64m2_t vy = __riscv_vle64_v_f64m2(&y[j], vl);
+
+            // 6. vy += vvals * vx with masking, (masked FMA)
+            // in masked position we dont do anything, we leave old y[i] values
+            //       vx = [4,   2]
+            //    vvals = [7,   0]   --------FMA------> vy = [10 + 4*7, 20]
+            //       vy = [10, 20]
+
+            // vcol_idx = [2,  -1]
+            //     mask = [1,   0]
+            vy = __riscv_vfmacc_vv_f64m2_m(mask,  // mask
+                                           vy,    // output vector where to accumulate
+                                           vvals, // first input vector
+                                           vx,    // second input vector
+                                           vl);
+
+            // 7. Write vy back to y
+            __riscv_vse64_v_f64m2(&y[j], vy, vl);
+        }
+    }
+}
+
+void mv_ell_symmetric_full_colmajor_vector_m4(int n,              // A matrix dimension (n x n)
+                                              int max_nnz_row,    // max number of off-diagonal nnz in rows
+                                              double *diag,       // dense diagonal
+                                              double *ell_values, // ELL values (size n * max_nnz_row)
+                                              uint64_t *ell_cols, // ELL column indices (size n * max_nnz_row)
+                                              double *x,          // input vector
+                                              double *y)          // output vector
+{
+    // 1) initialize y at zero
+    memset(y, 0, n * sizeof(double));
+
+    size_t vl;
+    // 2) diagonal contribution
+    for (size_t i = 0; i < (size_t)n; i += vl) {
+        int remaining = n - i;
+        vl = __riscv_vsetvl_e64m4(remaining);
+
+        vfloat64m4_t vdiag = __riscv_vle64_v_f64m4(&diag[i], vl);
+        vfloat64m4_t vx    = __riscv_vle64_v_f64m4(&x[i],    vl);
+        vfloat64m4_t vy    = __riscv_vle64_v_f64m4(&y[i],    vl);
+
+        vy = __riscv_vfmacc_vv_f64m4(vy, vdiag, vx, vl);
+        __riscv_vse64_v_f64m4(&y[i], vy, vl);
+    }
+
+    // 3) off-diagonal (ELL) contribution
+    for (int slot = 0; slot < max_nnz_row; ++slot) {
+        for (size_t j = 0; j < (size_t)n; j += vl) {
+            int remaining = n - j;
+            vl = __riscv_vsetvl_e64m4(remaining);
+
+            size_t base = slot * (size_t)n + j;
+
+            // load values and column indices
+            vfloat64m4_t vvals   = __riscv_vle64_v_f64m4(&ell_values[base], vl);
+            vuint64m4_t  vcolidx = __riscv_vle64_v_u64m4(&ell_cols[base],   vl);
+
+            // scale to byte‐offsets
+            vuint64m4_t scaled_idx = __riscv_vmul_vx_u64m4(vcolidx, 8, vl);
+
+            // mask invalid lanes (col == -1)
+            vbool16_t mask = __riscv_vmsne_vx_u64m4_b16(vcolidx,
+                                                        (uint64_t)-1,
+                                                        vl);
+
+            // gather x[col] under mask
+            vfloat64m4_t vx_g = __riscv_vluxei64_v_f64m4_m(mask,
+                                                            x,
+                                                            scaled_idx,
+                                                            vl);
+
+            // load y[j…]
+            vfloat64m4_t vy_g = __riscv_vle64_v_f64m4(&y[j], vl);
+
+            // vy += vvals * vx_g (masked)
+            vy_g = __riscv_vfmacc_vv_f64m4_m(mask,
+                                             vy_g,
+                                             vvals,
+                                             vx_g,
+                                             vl);
+
+            // store back to y[j…]
+            __riscv_vse64_v_f64m4(&y[j], vy_g, vl);
+        }
+    }
+}
+
+
+void mv_ell_symmetric_full_colmajor_vector_m8(int n,              // A matrix dimension (n x n)
+                                              int max_nnz_row,    // max number of off-diagonal nnz in rows
+                                              double *diag,       // dense diagonal
+                                              double *ell_values, // ELL values (size n * max_nnz_row)
+                                              uint64_t *ell_cols, // ELL column indices (size n * max_nnz_row)
+                                              double *x,          // input vector
+                                              double *y)          // output vector
+{
+    // 1) initialize y at zero
+    memset(y, 0, n * sizeof(double));
+
+    size_t vl;
+    // 2) diagonal contribution
+    for (size_t i = 0; i < (size_t)n; i += vl) {
+        int remaining = n - i;
+        vl = __riscv_vsetvl_e64m8(remaining);
+
+        vfloat64m8_t vdiag = __riscv_vle64_v_f64m8(&diag[i], vl);
+        vfloat64m8_t vx    = __riscv_vle64_v_f64m8(&x[i],    vl);
+        vfloat64m8_t vy    = __riscv_vle64_v_f64m8(&y[i],    vl);
+
+        vy = __riscv_vfmacc_vv_f64m8(vy, vdiag, vx, vl);
+        __riscv_vse64_v_f64m8(&y[i], vy, vl);
+    }
+
+    // 3) off-diagonal (ELL) contribution
+    for (int slot = 0; slot < max_nnz_row; ++slot) {
+        for (size_t j = 0; j < (size_t)n; j += vl) {
+            int remaining = n - j;
+            vl = __riscv_vsetvl_e64m8(remaining);
+
+            size_t base = slot * (size_t)n + j;
+
+            // load ELL values and column indices
+            vfloat64m8_t vvals   = __riscv_vle64_v_f64m8(&ell_values[base], vl);
+            vuint64m8_t  vcolidx = __riscv_vle64_v_u64m8(&ell_cols[base],   vl);
+
+            // scale to byte‐offsets
+            vuint64m8_t scaled_idx = __riscv_vmul_vx_u64m8(vcolidx, 8, vl);
+
+            // mask invalid lanes (col == -1)
+            vbool8_t mask = __riscv_vmsne_vx_u64m8_b8(vcolidx,
+                                                      (uint64_t)-1,
+                                                      vl);
+
+            // masked gather from x
+            vfloat64m8_t vx_g = __riscv_vluxei64_v_f64m8_m(mask,
+                                                            x,
+                                                            scaled_idx,
+                                                            vl);
+
+            // load y[j…]
+            vfloat64m8_t vy_g = __riscv_vle64_v_f64m8(&y[j], vl);
+
+            // vy += vvals * vx_g (masked)
+            vy_g = __riscv_vfmacc_vv_f64m8_m(mask,
+                                             vy_g,
+                                             vvals,
+                                             vx_g,
+                                             vl);
+
+            // store back to y[j…]
+            __riscv_vse64_v_f64m8(&y[j], vy_g, vl);
+        }
+    }
+}
+
+
+
+void mv_ell_symmetric_full_colmajor_vector_debug(int n,
+                                                 int max_nnz_row, // max number of off-diagonal nnz in rows
+                                                 double *diag,
+                                                 double *ell_values, // ELL values (size n * max_nnz_row)
+                                                 uint64_t *ell_cols, // ELL column indices (size n * max_nnz_row)
+                                                 double *x,          // input vector
+                                                 double *y)          // output vector
 {
     // 1) initialize y at zero
     memset(y, 0, n * sizeof(double));
@@ -76,50 +415,53 @@ void mv_ell_symmetric_full_colmajor_vector(int n,               // A matrix dime
 
             // vl = max(vlmax, remaining);
             vl = __riscv_vsetvl_e64m1(remaining);
+            printf("vl = %zu, remaining = %d\n", vl, remaining);
 
             size_t base_offset = slot * n + j;
 
             // 1. Load vl values from ell_values[] array, no gather needed
             vfloat64m1_t vvals = __riscv_vle64_v_f64m1(&ell_values[base_offset], vl);
+            print_vfloat64_vector(vvals, vl, "vvals[]");
 
             // 2. Load vl column indices from ell_cols[] array, no gather needed
             vuint64m1_t vcol_idx = __riscv_vle64_v_u64m1(&ell_cols[base_offset], vl);
+            print_vuint64_vector(vcol_idx, vl, "vcol_idx[]");
 
             vuint64m1_t scaled_idx = __riscv_vmul_vx_u64m1(vcol_idx, 8, vl);
 
             // 3. Build mask for patting (col == -1), 1 if valid, 0 if padding
+            // printf("BEfore mask construction\n");
             vbool64_t mask = __riscv_vmsne_vx_u64m1_b64(vcol_idx, (uint64_t)-1, vl);
+            print_mask_from_indices(&ell_cols[base_offset], vl);
+            // printf("After mask construction\n");
 
             // 4. gather from x[col] with index vector vcol_idx
-
-            //! --------------------------------------------------------------------------------------
-            //! This can be used with the unmasked FMA
+            // printf("Before gather\n");
+            print_vector(x, n, "x (input vector)"); // print input vector x
+            // printf("Address of x: %p\n", (void *)x);
+            // print_vuint64_vector_raw(vcol_idx, vl, "vcol_idx (indices)"); // print column indices
+            // print_vuint64_vector(vcol_idx, vl, "vcol_idx[]");
             // vfloat64m1_t vz = __riscv_vfmv_v_f_f64m1(0.0, vl);  // initialize to all zeros ds
+            // vx = __riscv_vluxei64_v_f64m1_m(mask, x, scaled_idx, vl);
+            // print_vfloat64_vector(vz, vl, "vx (before gather)"); // print before gather
+            vfloat64m1_t vx = __riscv_vluxei64_v_f64m1_m(mask, x, scaled_idx, vl);
             // vfloat64m1_t vx = __riscv_vluxei64_v_f64m1_mu(  //masked gather starting with all zeros
             //     mask, //  mask
             //     vz,   //  masked-off operand
             //     x,    //  base pointer
             //     scaled_idx,  // indices,
             //     vl);
-            //! --------------------------------------------------------------------------------------
-
-            //! --------------------------------------------------------------------------------------
-            //! This can be used only with the masked FMA,
-            //! it stores NaN's in padding positions
-            vfloat64m1_t vx = __riscv_vluxei64_v_f64m1_m(mask, x, scaled_idx, vl);
-            //! --------------------------------------------------------------------------------------
+            print_vfloat64_vector(vx, vl, "vx[] (after gather)"); // print before gather
+            // printf("After gather\n");
 
             // 5. Load vl contiguous elements of y, no gather needed
             vfloat64m1_t vy = __riscv_vle64_v_f64m1(&y[j], vl);
+            print_vfloat64_vector(vy, vl, "vy[] (before FMA)");
 
             // 6. vy += vvals * vx with mask
-            //! --------------------------------------------------------------------------------------
             vy = __riscv_vfmacc_vv_f64m1_m(mask, vy, vvals, vx, vl); // masked  (skip invalid lanes (with NaN))
-            //! --------------------------------------------------------------------------------------
-
-            //! --------------------------------------------------------------------------------------
-            // vy = __riscv_vfmacc_vv_f64m1(vy, vvals, vx, vl);    // non maksed (accumulate zeros) //! this dones't work if you have NaN's in padded positions in x
-            //! --------------------------------------------------------------------------------------
+            print_vfloat64_vector(vy, vl, "vy[] (after FMA)");
+            // vy = __riscv_vfmacc_vv_f64m1(vy, vvals, vx, vl);    // non maksed (accumlate zeros )
 
             // 7. Write y
             __riscv_vse64_v_f64m1(&y[j], vy, vl);

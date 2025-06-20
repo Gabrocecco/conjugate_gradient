@@ -146,12 +146,16 @@ int test_cg_ell_full_colmajor_vectorized()
     // Compute the maximum number of non-zero elements in each row of the upper triangular part
     int nnz_max = compute_max_nnz_row_full(count_diag, count_upper, lowerAddr, upperAddr);
     printf("nnz_max = %d\n", nnz_max);
+
     // Allocate memory for the ELL format
     double *ell_values = malloc(nnz_max * count_diag * sizeof(double));
     int *ell_col_idx = malloc(nnz_max * count_diag * sizeof(int));
+    // uint64_t *ell_col_idx = malloc(nnz_max * count_diag * sizeof(uint64_t));
 
     // Convert the COO format to ELL format
     coo_to_ell_symmetric_full_colmajor(count_diag, count_upper, upper, lowerAddr, upperAddr, ell_values, ell_col_idx, nnz_max);
+
+    // coo_to_ell_symmetric_full_colmajor_sdtint(count_diag, count_upper, upper, lowerAddr, upperAddr, ell_values, ell_col_idx, nnz_max)
 
     // Print the ELL format analysis
     analyze_ell_matrix_full_colmajor(count_diag, nnz_max, ell_values, ell_col_idx);
@@ -179,7 +183,7 @@ int test_cg_ell_full_colmajor_vectorized()
             diag,        // diag[]
             count_upper, // upper_count
             ell_values,  // valori ELL
-            ell_cols64, // indici ELL (uint64_t*)
+            ell_cols64,  // indici ELL (uint64_t*)
             nnz_max,     // max_nnz_row
             source,      // b[]
             y,           // x[] (output)
