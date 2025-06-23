@@ -12,58 +12,142 @@ spike --isa=rv64gcv pk build/test_cg_vec
 
 // VLMAX = 2 (128b)
 
-// out = a + alpha * b
-// void vec_axpy_vector(double *a, double *b, double alpha, double *out, int n)
+// void vec_axpy(double *a, double *b, double alpha, double *out, int n)
 // {
-//     // for (int i = 0; i < n; i++)
-//     // {
-//     //     out[i] = a[i] + alpha * b[i];
-//     // }
-
-// size_t vl;
-// for (size_t i = 0; i < n; i += vl)
-// {
-//     int remaining = n - i;
-//     vl = __riscv_vsetvl_e64m1(remaining);
+//     for (int i = 0; i < n; i++)
+//     {
+//         out[i] = a[i] + alpha * b[i];
+//     }
 // }
+void vec_axpy_vectorized(double *a, double *b, double alpha, double *out, int n)
+{
+    size_t vl;
+    for (size_t i = 0; i < n; i += vl)
+    {
+        int remaining = n - i;
+        vl = __riscv_vsetvl_e64m1(remaining);
 
+        vfloat64m1_t va = __riscv_vle64_v_f64m1(&a[i], vl);
+        vfloat64m1_t vb = __riscv_vle64_v_f64m1(&b[i], vl);
 
+        /*
+        vfloat64m1_t __riscv_vfmacc_vf_f64m1(
+            vfloat64m1_t vd,
+            float64_t rs1,
+            vfloat64m1_t vs2,
+            size_t vl)
+        */
+        vfloat64m1_t result = __riscv_vfmacc_vf_f64m1(va, alpha, vb, vl);
+
+        __riscv_vse64_v_f64m1(&out[i], // destintion, where to write
+                              result,    // input, what to write
+                              vl);
+    }
+}
+
+void vec_axpy_vectorized_debug(double *a, double *b, double alpha, double *out, int n)
+{
+    size_t vl;
+    for (size_t i = 0; i < n; i += vl)
+    {
+        int remaining = n - i;
+        vl = __riscv_vsetvl_e64m1(remaining);
+
+        vfloat64m1_t va = __riscv_vle64_v_f64m1(&a[i], vl);
+        vfloat64m1_t vb = __riscv_vle64_v_f64m1(&b[i], vl);
+        print_vfloat64_vector(va, vl, "va[]");
+        print_vfloat64_vector(vb, vl, "vb[]");
+        /*
+        vfloat64m1_t __riscv_vfmacc_vf_f64m1(
+            vfloat64m1_t vd,
+            float64_t rs1,
+            vfloat64m1_t vs2,
+            size_t vl)
+        */
+        vfloat64m1_t result = __riscv_vfmacc_vf_f64m1(va, alpha, vb, vl);
+        print_vfloat64_vector(result, vl, "result[]");
+
+        __riscv_vse64_v_f64m1(&out[i], // destintion, where to write
+                              result,    // input, what to write
+                              vl);
+    }
+}
 
 // out = a^T * b
-// double vec_dot(double *a,
-//                double *b,
-//                int n)
-// {
-//     // 1) compute vmax 
-//     size_t vl_max = __riscv_vsetvl_e64m1(n);
+double vec_dot_vectorized(double *a,
+                          double *b,
+                          int n)
+{
+    // 1) compute vmax
+    size_t vl_max = __riscv_vsetvl_e64m1(n);
 
-//     // 2) initiliaze a vector accumulato at zero
-//     vfloat64m1_t vacc = __riscv_vfmv_v_f_f64m1(0.0, vl_max);
+    // 2) initiliaze a vector accumulato at zero
+    vfloat64m1_t vacc = __riscv_vfmv_v_f_f64m1(0.0, vl_max);
 
-//     size_t vl;
-//     // 3) loop (main loop + tail)
-//     for (size_t i = 0; i < (size_t)n; i += vl) {
-//         size_t rem = n - i;
-//         vl = __riscv_vsetvl_e64m1(rem);
+    size_t vl;
+    // 3) loop (main loop + tail)
+    for (size_t i = 0; i < (size_t)n; i += vl)
+    {
+        size_t rem = n - i;
+        vl = __riscv_vsetvl_e64m1(rem);
 
-//         vfloat64m1_t va = __riscv_vle64_v_f64m1(&a[i], vl);
-//         vfloat64m1_t vb = __riscv_vle64_v_f64m1(&b[i], vl);
+        vfloat64m1_t va = __riscv_vle64_v_f64m1(&a[i], vl);
+        vfloat64m1_t vb = __riscv_vle64_v_f64m1(&b[i], vl);
 
-//         // vacc += va * vb
-//         vacc = __riscv_vfmacc_vv_f64m1(vacc, va, vb, vl);
-//     }
+        // vacc += va * vb
+        vacc = __riscv_vfmacc_vv_f64m1(vacc, va, vb, vl);
+    }
 
-//     // 4) replicate thereduction in all elements of vacc
-//     vacc = __riscv_vfredosum_vs_f64m1_f64m1(vacc, vacc, 0.0, vl_max);
+    // 4) replicate the reduction in all elements of vacc
+    vfloat64m1_t vzero = __riscv_vfmv_v_f_f64m1(0.0, vl_max);
+    vacc = __riscv_vfredosum_vs_f64m1_f64m1(vacc, vzero, vl_max);
 
-//     // 5) extarct the first and save in result 
-//     double result;
-//     __riscv_vse64_v_f64m1(&result, vacc, 1);
+    // 5) extarct the first and save in result
+    double result;
+    __riscv_vse64_v_f64m1(&result, vacc, 1);
 
-//     return result;
-// }
+    return result;
+}
 
-// VLMAX = 2 
+double vec_dot_vectorized_debug(double *a,
+                                double *b,
+                                int n)
+{
+    // 1) compute vmax
+    size_t vl_max = __riscv_vsetvl_e64m1(n);
+
+    // 2) initiliaze a vector accumulato at zero
+    vfloat64m1_t vacc = __riscv_vfmv_v_f_f64m1(0.0, vl_max);
+    print_vfloat64_vector(vacc, vl_max, "vacc[] (before main loop)");
+
+    size_t vl;
+    // 3) loop (main loop + tail)
+    for (size_t i = 0; i < (size_t)n; i += vl)
+    {
+        size_t rem = n - i;
+        vl = __riscv_vsetvl_e64m1(rem);
+
+        vfloat64m1_t va = __riscv_vle64_v_f64m1(&a[i], vl);
+        print_vfloat64_vector(va, vl, "va[]");
+        vfloat64m1_t vb = __riscv_vle64_v_f64m1(&b[i], vl);
+        print_vfloat64_vector(va, vl, "vb[]");
+
+        // vacc += va * vb
+        vacc = __riscv_vfmacc_vv_f64m1(vacc, va, vb, vl);
+        print_vfloat64_vector(va, vl, "vacc[]");
+    }
+
+    // 4) replicate the reduction in all elements of vacc
+    vfloat64m1_t vzero = __riscv_vfmv_v_f_f64m1(0.0, vl_max);
+    vacc = __riscv_vfredosum_vs_f64m1_f64m1(vacc, vzero, vl_max);
+    print_vfloat64_vector(vacc, vl, "vacc[] (after reduction and brodcast)");
+
+    // 5) extarct the first and save in result
+    double result;
+    __riscv_vse64_v_f64m1(&result, vacc, 1);
+
+    return result;
+}
 
 void mv_ell_symmetric_full_colmajor_vector(int n,              // A matrix dimension (n x n)
                                            int max_nnz_row,    // max number of off-diagonal nnz in rows

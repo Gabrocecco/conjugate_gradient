@@ -9,19 +9,17 @@
 #include "ell.h"
 #include "vectorized.h"
 
-
-
 /* Solving Ax = b with CG method (ELL) */
 int conjugate_gradient_ell_full_colmajor_vectorized(const int n,        // matrix size (n x n)
-                           double *diag,       // diagonal elements (exactly n dense elements)
-                           int upper_count,    // number of non-zero elements in the upper triangular part
-                           double *ell_values, // non-zero elements in the upper triangular part
-                           uint64_t *ell_col,       // starting index in upper[] for every row
-                           int max_nnz_row,    // maximum number of non-zeros per row in ELL format
-                           double *b,          // input vector
-                           double *x,          // output vector
-                           int max_iter,       // maximum number of iterations
-                           double tol          // tolerance for convergence
+                                                    double *diag,       // diagonal elements (exactly n dense elements)
+                                                    int upper_count,    // number of non-zero elements in the upper triangular part
+                                                    double *ell_values, // non-zero elements in the upper triangular part
+                                                    uint64_t *ell_col,  // starting index in upper[] for every row
+                                                    int max_nnz_row,    // maximum number of non-zeros per row in ELL format
+                                                    double *b,          // input vector
+                                                    double *x,          // output vector
+                                                    int max_iter,       // maximum number of iterations
+                                                    double tol          // tolerance for convergence
 )
 {
     printf("CG (ELL) \n\n");
@@ -52,20 +50,26 @@ int conjugate_gradient_ell_full_colmajor_vectorized(const int n,        // matri
     // Initialize the search direction p_0 := r_0
     vec_assign(p, r, n); // p_0 = r_0
 
-    double r_dot_r_old = vec_dot(r, r, n); // r_k^T * r_k
+    // double r_dot_r_old = vec_dot(r, r, n); // r_k^T * r_k
+    double r_dot_r_old = vec_dot_vectorized(r, r, n); // r_k^T * r_k
+
     double r_dot_r_new = 0.0;
 
     for (int iter = 1; iter < max_iter; iter++)
     {
         mv_ell_symmetric_full_colmajor_vector_m8(n, max_nnz_row, diag, ell_values, ell_col, p, Ap);
-        double alpha = r_dot_r_old / vec_dot(p, Ap, n);                           // alpha = (r^T * r) / (p^T * A * p)
-
+        // double alpha = r_dot_r_old / vec_dot(p, Ap, n);                           // alpha = (r^T * r) / (p^T * A * p)
+        double alpha = r_dot_r_old / vec_dot_vectorized(p, Ap, n);
         // print alpha
-        vec_axpy(x, p, alpha, x, n); // x_{k+1} = x_k + alpha * p_k
+        // vec_axpy(x, p, alpha, x, n); // x_{k+1} = x_k + alpha * p_k
+        vec_axpy_vectorized(x, p, alpha, x, n);
 
-        vec_axpy(r, Ap, -alpha, r, n); // r_{k+1} = r_k - alpha * A p_k
+        // vec_axpy(r, Ap, -alpha, r, n); // r_{k+1} = r_k - alpha * A p_k
+        vec_axpy_vectorized(r, Ap, -alpha, r, n); // r_{k+1} = r_k - alpha * A p_k
 
-        r_dot_r_new = vec_dot(r, r, n); // r_{k+1}^T * r_{k+1}
+
+        // r_dot_r_new = vec_dot(r, r, n); // r_{k+1}^T * r_{k+1}
+        r_dot_r_new = vec_dot_vectorized(r, r, n); // r_{k+1}^T * r_{k+1}
 
         // If r_{k+1} is small enough, we stop
         // if (sqrt(r_dot_r_new) < tol)    // if sqrt(r_{k+1}^T * r_{k+1}) < tol
@@ -83,7 +87,8 @@ int conjugate_gradient_ell_full_colmajor_vectorized(const int n,        // matri
 
         double beta = r_dot_r_new / r_dot_r_old; // beta = (r_{k+1}^T * r_{k+1}) / (r_k^T * r_k)
 
-        vec_axpy(r, p, beta, p, n); // p_{k+1} = r_{k+1} + beta * p_k
+        // vec_axpy(r, p, beta, p, n); // p_{k+1} = r_{k+1} + beta * p_k
+        vec_axpy_vectorized(r, p, beta, p, n); // p_{k+1} = r_{k+1} + beta * p_k
 
         r_dot_r_old = r_dot_r_new; // Update r_dot_r_old for the next iteration
 

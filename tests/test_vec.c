@@ -12,7 +12,7 @@
 #include "coo.h"
 #include "csr.h"
 #include "parser.h"
-#include "mmio.h"   
+#include "mmio.h"
 
 /*
 riscv64-unknown-elf-gcc -O0 -march=rv64gcv -mabi=lp64d   -std=c99 -Wall -pedantic -Iinclude   -o build/test_vec src/vectorized.c src/ell.c tests/test_vec.c
@@ -25,8 +25,8 @@ spike --isa=rv64gcv pk build/test_vec
 
 void test_mv_ell_vec_with_5x5_matrix()
 {
-    #define N_DIM 5
-    #define MAX_NNZ 3
+#define N_DIM 5
+#define MAX_NNZ 3
 
     // Diagonal
     double diag[N_DIM] = {10.0, 20.0, 30.0, 40.0, 50.0};
@@ -381,7 +381,8 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
 
     // 8) Print results side by side
     puts(" y (serial)   |  y (vectorized)");
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; ++i)
+    {
         printf("%12g  |  %12g\n", y[i], y_vectorized[i]);
     }
 
@@ -421,7 +422,8 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
  *
  * filename : path to the Matrix Market file
  */
-void test_mv_ell_vec_from_matrix_market(const char *filename) {
+void test_mv_ell_vec_from_matrix_market(const char *filename)
+{
     MM_typecode matcode;
     FILE *f;
     int M, N, nz;
@@ -429,40 +431,47 @@ void test_mv_ell_vec_from_matrix_market(const char *filename) {
     double *val;
 
     // 1) open and read banner
-    if ((f = fopen(filename, "r")) == NULL) {
+    if ((f = fopen(filename, "r")) == NULL)
+    {
         perror("fopen");
         exit(EXIT_FAILURE);
     }
-    if (mm_read_banner(f, &matcode) != 0) {
+    if (mm_read_banner(f, &matcode) != 0)
+    {
         fprintf(stderr, "Could not process Matrix Market banner.\n");
         exit(EXIT_FAILURE);
     }
     // we only support real, sparse, symmetric or general square
-    if (!mm_is_matrix(matcode) || !mm_is_sparse(matcode)) {
+    if (!mm_is_matrix(matcode) || !mm_is_sparse(matcode))
+    {
         fprintf(stderr, "Only sparse real matrices supported.\n");
         exit(EXIT_FAILURE);
     }
     // 2) read dimensions
-    if (mm_read_mtx_crd_size(f, &M, &N, &nz) != 0) {
+    if (mm_read_mtx_crd_size(f, &M, &N, &nz) != 0)
+    {
         fprintf(stderr, "Failed to read matrix size.\n");
         exit(EXIT_FAILURE);
     }
-    if (M != N) {
+    if (M != N)
+    {
         fprintf(stderr, "Matrix must be square (M=%d, N=%d)\n", M, N);
         exit(EXIT_FAILURE);
     }
 
     // 3) allocate for COO input
-    I   = malloc(nz * sizeof(*I));
-    J   = malloc(nz * sizeof(*J));
+    I = malloc(nz * sizeof(*I));
+    J = malloc(nz * sizeof(*J));
     val = malloc(nz * sizeof(*val));
-    if (!I || !J || !val) {
+    if (!I || !J || !val)
+    {
         perror("malloc");
         exit(EXIT_FAILURE);
     }
 
     // 4) read all entries (1-based to 0-based)
-    for (int k = 0; k < nz; ++k) {
+    for (int k = 0; k < nz; ++k)
+    {
         int ii, jj;
         double vv;
         fscanf(f, "%d %d %lg\n", &ii, &jj, &vv);
@@ -474,17 +483,24 @@ void test_mv_ell_vec_from_matrix_market(const char *filename) {
 
     // 5) split into diagonal + strictly-upper arrays
     double *diag = calloc(N, sizeof(*diag));
-    int    upper_nnz = 0;
+    int upper_nnz = 0;
     // first pass: count strict-upper entries
-    for (int k = 0; k < nz; ++k) {
+    for (int k = 0; k < nz; ++k)
+    {
         int i = I[k], j = J[k];
-        if (i == j) {
+        if (i == j)
+        {
             diag[i] = val[k];
-        } else {
+        }
+        else
+        {
             // treat every off-diag as one strict upper entry
-            if (i < j) {
+            if (i < j)
+            {
                 ++upper_nnz;
-            } else if (mm_is_symmetric(matcode)) {
+            }
+            else if (mm_is_symmetric(matcode))
+            {
                 // symmetric file: entry (j,i) implied, count (j,i)
                 ++upper_nnz;
             }
@@ -493,27 +509,33 @@ void test_mv_ell_vec_from_matrix_market(const char *filename) {
 
     // 6) allocate strict-upper COO arrays
     double *coo_vals_upper = malloc(upper_nnz * sizeof(*coo_vals_upper));
-    int    *coo_rows       = malloc(upper_nnz * sizeof(*coo_rows));
-    int    *coo_cols       = malloc(upper_nnz * sizeof(*coo_cols));
-    if (!coo_vals_upper || !coo_rows || !coo_cols) {
+    int *coo_rows = malloc(upper_nnz * sizeof(*coo_rows));
+    int *coo_cols = malloc(upper_nnz * sizeof(*coo_cols));
+    if (!coo_vals_upper || !coo_rows || !coo_cols)
+    {
         perror("malloc");
         exit(EXIT_FAILURE);
     }
     // second pass: fill them
     int idx = 0;
-    for (int k = 0; k < nz; ++k) {
+    for (int k = 0; k < nz; ++k)
+    {
         int i = I[k], j = J[k];
         double v = val[k];
-        if (i == j) continue;
-        if (i < j) {
-            coo_rows[idx]       = i;
-            coo_cols[idx]       = j;
+        if (i == j)
+            continue;
+        if (i < j)
+        {
+            coo_rows[idx] = i;
+            coo_cols[idx] = j;
             coo_vals_upper[idx] = v;
             ++idx;
-        } else if (mm_is_symmetric(matcode)) {
+        }
+        else if (mm_is_symmetric(matcode))
+        {
             // flip into strict upper
-            coo_rows[idx]       = j;
-            coo_cols[idx]       = i;
+            coo_rows[idx] = j;
+            coo_cols[idx] = i;
             coo_vals_upper[idx] = v;
             ++idx;
         }
@@ -530,17 +552,15 @@ void test_mv_ell_vec_from_matrix_market(const char *filename) {
 
     // 8) build ELL
     int max_nnz_row = compute_max_nnz_row_full(
-        N, upper_nnz, coo_rows, coo_cols
-    );
+        N, upper_nnz, coo_rows, coo_cols);
     printf("max_nnz_row = %d\n", max_nnz_row);
     double *ell_values = calloc((size_t)N * max_nnz_row, sizeof(*ell_values));
-    int    *ell_cols   = malloc(       (size_t)N * max_nnz_row * sizeof(*ell_cols));
+    int *ell_cols = malloc((size_t)N * max_nnz_row * sizeof(*ell_cols));
     coo_to_ell_symmetric_full_colmajor(
         N, upper_nnz,
         coo_vals_upper, coo_rows, coo_cols,
         ell_values, ell_cols,
-        max_nnz_row
-    );
+        max_nnz_row);
     analyze_ell_matrix_full_colmajor(N, max_nnz_row, ell_values, ell_cols);
 
     // 9) allocate and fill random x
@@ -549,7 +569,7 @@ void test_mv_ell_vec_from_matrix_market(const char *filename) {
         x[i] = rand() / (double)RAND_MAX;
 
     // 10) allocate y and y_vectorized
-    double *y            = calloc((size_t)N, sizeof(*y));
+    double *y = calloc((size_t)N, sizeof(*y));
     double *y_vectorized = calloc((size_t)N, sizeof(*y_vectorized));
 
     // convert cols to 64-bit
@@ -559,15 +579,14 @@ void test_mv_ell_vec_from_matrix_market(const char *filename) {
 
     // 11) run mat-vec: serial and vectorized
     mv_ell_symmetric_full_colmajor_sdtint(
-        N, max_nnz_row, diag, ell_values, ell_cols64, x, y
-    );
+        N, max_nnz_row, diag, ell_values, ell_cols64, x, y);
     mv_ell_symmetric_full_colmajor_vector(
-        N, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized
-    );
+        N, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
 
     // 12) print and compare
     puts(" y (serial)   |  y (vectorized)");
-    for (int i = 0; i < N; ++i) {
+    for (int i = 0; i < N; ++i)
+    {
         printf("%12g  |  %12g\n", y[i], y_vectorized[i]);
     }
     int pass = 1;
@@ -577,13 +596,154 @@ void test_mv_ell_vec_from_matrix_market(const char *filename) {
     printf("%s\n", pass ? "PASS: match!" : "FAIL: mismatch!");
 
     // 13) clean up
-    free(I); free(J); free(val);
+    free(I);
+    free(J);
+    free(val);
     free(diag);
     free(coo_vals_upper);
-    free(coo_rows); free(coo_cols);
+    free(coo_rows);
+    free(coo_cols);
     free(ell_values);
-    free(ell_cols); free(ell_cols64);
-    free(x); free(y); free(y_vectorized);
+    free(ell_cols);
+    free(ell_cols64);
+    free(x);
+    free(y);
+    free(y_vectorized);
+}
+
+void test_dot_product_vec()
+{
+    printf("=== dot product test ===\n");
+
+    // --- Fixed small test ---
+    {
+        double a[] = {1.0, 2.0, 3.0, 4.0};
+        double b[] = {5.0, 6.0, 7.0, 8.0};
+        int n = sizeof(a) / sizeof(a[0]);
+
+        // compute reference
+        double expected = 0.0;
+        for (int i = 0; i < n; ++i)
+        {
+            expected += a[i] * b[i];
+        }
+
+        // compute with vectorized dot
+        double result = vec_dot_vectorized_debug(a, b, n);
+
+        printf("Fixed test (n=%d): expected = %g, vec_dot = %g -> %s\n",
+               n, expected, result,
+               fp_eq(expected, result, 1e-6) ? "PASS" : "FAIL");
+    }
+
+    // --- Randomized test ---
+    {
+        const int n = 1024;
+        double *a = malloc(n * sizeof(*a));
+        double *b = malloc(n * sizeof(*b));
+        if (!a || !b)
+        {
+            perror("malloc");
+            exit(EXIT_FAILURE);
+        }
+
+        // fill with random [0,1)
+        for (int i = 0; i < n; ++i)
+        {
+            a[i] = rand() / (double)RAND_MAX;
+            b[i] = rand() / (double)RAND_MAX;
+        }
+
+        // scalar reference
+        double expected = 0.0;
+        for (int i = 0; i < n; ++i)
+        {
+            expected += a[i] * b[i];
+        }
+
+        // vectorized
+        double result = vec_dot_vectorized(a, b, n);
+
+        printf("Random test (n=%d): expected = %g, vec_dot = %g -> %s\n",
+               n, expected, result,
+               fp_eq(expected, result, 1e-6) ? "PASS" : "FAIL");
+
+        free(a);
+        free(b);
+    }
+
+    printf("\n");
+}
+
+void test_vec_axpy_vector()
+{
+    printf("=== AXPY vectorized test ===\n");
+
+    // ---- Fixed small test ----
+    {
+        double a[] = {1.0, 2.0, 3.0, 4.0};
+        double b[] = {5.0, 6.0, 7.0, 8.0};
+        double alpha = 2.0;
+        int n = sizeof(a) / sizeof(a[0]);
+        double out_ref[4], out_vec[4];
+
+        for (int i = 0; i < n; ++i)
+            out_ref[i] = a[i] + alpha * b[i];
+        vec_axpy_vectorized_debug(a, b, alpha, out_vec, n);
+
+        int pass = 1;
+        for (int i = 0; i < n; ++i)
+        {
+            if (!fp_eq(out_ref[i], out_vec[i], 1e-9))
+            {
+                pass = 0;
+                printf("FAIL idx=%d: ref=%g vec=%g\n",
+                       i, out_ref[i], out_vec[i]);
+            }
+        }
+        printf("Fixed test (n=%d): %s\n\n", n,
+               pass ? "PASS" : "FAIL");
+    }
+
+    // ---- Randomized test ----
+    {
+        const int n = 1024;
+        double *a = malloc(n * sizeof(*a));
+        double *b = malloc(n * sizeof(*b));
+        double *out_ref = malloc(n * sizeof(*out_ref));
+        double *out_vec = malloc(n * sizeof(*out_vec));
+        double alpha = 0.37;
+
+        // fill with random [0,1)
+        for (int i = 0; i < n; ++i)
+        {
+            a[i] = rand() / (double)RAND_MAX;
+            b[i] = rand() / (double)RAND_MAX;
+        }
+
+        for (int i = 0; i < n; ++i)
+            out_ref[i] = a[i] + alpha * b[i];
+        vec_axpy_vectorized(a, b, alpha, out_vec, n);
+
+        int pass = 1;
+        for (int i = 0; i < n; ++i)
+        {
+            if (!fp_eq(out_ref[i], out_vec[i], 1e-9))
+            {
+                pass = 0;
+                printf("FAIL idx=%d: ref=%g vec=%g\n",
+                       i, out_ref[i], out_vec[i]);
+                break;
+            }
+        }
+        printf("Random test (n=%d): %s\n\n", n,
+               pass ? "PASS" : "FAIL");
+
+        free(a);
+        free(b);
+        free(out_ref);
+        free(out_vec);
+    }
 }
 
 int main(void)
@@ -605,7 +765,11 @@ int main(void)
 
     // test_mv_ell_vec_from_openfoam_coo_matrix("data/data.txt");
 
-    test_mv_ell_vec_from_matrix_market("data/mkt_real_symmetric/bcsstk04.mtx");
+    // test_mv_ell_vec_from_matrix_market("data/mkt_real_symmetric/bcsstk04.mtx");
+
+    // test_dot_product_vec();
+
+    test_vec_axpy_vector();
 
     return 0;
 }

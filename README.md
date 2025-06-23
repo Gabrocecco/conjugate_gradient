@@ -25,8 +25,10 @@ Supported matrix formats:
 - [] SELL
 ```
 
-Vectorized kernels: 
-- Matrix Vector product in ELL format [src/vectorized.c](src/vectorized.c) 
+Vectorized kernels ([src/vectorized.c](src/vectorized.c) ): 
+- Matrix Vector product (ELL)
+- Dot product 
+- SAXPY
 
 
 ```text
