@@ -9,6 +9,8 @@ OPT_FLAGS=-O3 -DNDEBUG -march=native -mtune=native
 RISCV_CC     := riscv64-unknown-elf-gcc
 RISCV_FLAGS  := -O0 -march=rv64gcv -mabi=lp64d
 
+RISCV_FLAGS_OPT := -O0 -march=rv64gcv -mabi=lp64d
+
 SPIKERUN     := spike --isa=rv64gcv pk
 
 BUILD_DIR=build
@@ -62,7 +64,11 @@ test_vec: $(BUILD_DIR)
 		-o $(BUILD_DIR)/test_vec \
 		src/vectorized.c \
 		src/ell.c \
+		src/coo.c \
+		src/csr.c \
 		src/common.c \
+		src/parser.c \
+		src/mmio.c \
 		tests/test_vec.c
 
 run_test_vec: test_vec 

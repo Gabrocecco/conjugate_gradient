@@ -1,6 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void generate_sparse_symmetric_coo(int n, double sparsity,
+                                  int *upper_nnz,
+                                  double **coo_values_upper,
+                                  int **coo_rows,
+                                  int **coo_cols,
+                                  double **diagonal);
+
 // this function returns the value of the matrix at (i,j) position
 double get_matrix_entry_symmetric_coo(int i,
                                       int j,

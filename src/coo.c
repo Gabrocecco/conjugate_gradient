@@ -18,6 +18,61 @@ void print_dense_symmeric_matrix_from_coo(int n, double *diag, double *upper, in
     }
 }
 
+/*
+  Generate a sparse symemtric matrix in COO 
+   - n           : 
+   - sparsity    : probablility of non zero in every off diagonal dimension 
+  Output:
+   - *upper_nnz           = 
+   - *coo_values_upper    = 
+   - *coo_rows, *coo_cols = indici 
+   - *diagonal            = 
+*/
+void generate_sparse_symmetric_coo(int n, double sparsity,
+                                  int *upper_nnz,
+                                  double **coo_values_upper,
+                                  int **coo_rows,
+                                  int **coo_cols,
+                                  double **diagonal)
+{
+    // 1) alloca la diagonale e popolala
+    *diagonal = malloc(n * sizeof(double));
+    if (!*diagonal) { perror("malloc diagonal"); exit(EXIT_FAILURE); }
+    for (int i = 0; i < n; ++i)
+        (*diagonal)[i] = rand() / (double)RAND_MAX;
+
+    // 2) capacità massima (metà superiore completa)
+    int max_entries = n*(n-1)/2;
+    *coo_values_upper = malloc(max_entries * sizeof(double));
+    *coo_rows        = malloc(max_entries * sizeof(int));
+    *coo_cols        = malloc(max_entries * sizeof(int));
+    if (!*coo_values_upper || !*coo_rows || !*coo_cols) {
+        perror("malloc coo arrays");
+        exit(EXIT_FAILURE);
+    }
+
+    // 3) singola passata per riempire
+    int idx = 0;
+    for (int i = 0; i < n; ++i) {
+        for (int j = i+1; j < n; ++j) {
+            if (rand() / (double)RAND_MAX < sparsity) {
+                (*coo_rows)[idx]        = i;
+                (*coo_cols)[idx]        = j;
+                (*coo_values_upper)[idx]= rand() / (double)RAND_MAX;
+                ++idx;
+            }
+        }
+    }
+
+    // 4) fissiamo upper_nnz e, opzionale, riduciamo con realloc
+    *upper_nnz = idx;
+    if (idx < max_entries) {
+        *coo_rows        = realloc(*coo_rows,        idx * sizeof(int));
+        *coo_cols        = realloc(*coo_cols,        idx * sizeof(int));
+        *coo_values_upper= realloc(*coo_values_upper,idx * sizeof(double));
+    }
+}
+
 // this function returns the value of the matrix at (i,j) position
 double get_matrix_entry_symmetric_coo(int i,
                                       int j,

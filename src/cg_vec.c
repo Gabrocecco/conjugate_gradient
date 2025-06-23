@@ -37,7 +37,7 @@ int conjugate_gradient_ell_full_colmajor_vectorized(const int n,        // matri
     }
 
     // Initialize the residual vector r_0 := b - A x_0
-    mv_ell_symmetric_full_colmajor_vector(n, max_nnz_row, diag, ell_values, ell_col, x, r);
+    mv_ell_symmetric_full_colmajor_vector_m8(n, max_nnz_row, diag, ell_values, ell_col, x, r);
     vec_sub(b, r, r, n); // r_0 = b - A x_0
 
     printf("r[0...4] = \n");
@@ -57,7 +57,7 @@ int conjugate_gradient_ell_full_colmajor_vectorized(const int n,        // matri
 
     for (int iter = 1; iter < max_iter; iter++)
     {
-        mv_ell_symmetric_full_colmajor_vector(n, max_nnz_row, diag, ell_values, ell_col, p, Ap);
+        mv_ell_symmetric_full_colmajor_vector_m8(n, max_nnz_row, diag, ell_values, ell_col, p, Ap);
         double alpha = r_dot_r_old / vec_dot(p, Ap, n);                           // alpha = (r^T * r) / (p^T * A * p)
 
         // print alpha

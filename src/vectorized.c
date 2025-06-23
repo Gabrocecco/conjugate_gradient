@@ -10,6 +10,61 @@ riscv64-unknown-elf-gcc   -O0 -march=rv64gcv -mabi=lp64d   -std=c99 -Wall -pedan
 spike --isa=rv64gcv pk build/test_cg_vec
 */
 
+// VLMAX = 2 (128b)
+
+// out = a + alpha * b
+// void vec_axpy_vector(double *a, double *b, double alpha, double *out, int n)
+// {
+//     // for (int i = 0; i < n; i++)
+//     // {
+//     //     out[i] = a[i] + alpha * b[i];
+//     // }
+
+// size_t vl;
+// for (size_t i = 0; i < n; i += vl)
+// {
+//     int remaining = n - i;
+//     vl = __riscv_vsetvl_e64m1(remaining);
+// }
+
+
+
+// out = a^T * b
+// double vec_dot(double *a,
+//                double *b,
+//                int n)
+// {
+//     // 1) compute vmax 
+//     size_t vl_max = __riscv_vsetvl_e64m1(n);
+
+//     // 2) initiliaze a vector accumulato at zero
+//     vfloat64m1_t vacc = __riscv_vfmv_v_f_f64m1(0.0, vl_max);
+
+//     size_t vl;
+//     // 3) loop (main loop + tail)
+//     for (size_t i = 0; i < (size_t)n; i += vl) {
+//         size_t rem = n - i;
+//         vl = __riscv_vsetvl_e64m1(rem);
+
+//         vfloat64m1_t va = __riscv_vle64_v_f64m1(&a[i], vl);
+//         vfloat64m1_t vb = __riscv_vle64_v_f64m1(&b[i], vl);
+
+//         // vacc += va * vb
+//         vacc = __riscv_vfmacc_vv_f64m1(vacc, va, vb, vl);
+//     }
+
+//     // 4) replicate thereduction in all elements of vacc
+//     vacc = __riscv_vfredosum_vs_f64m1_f64m1(vacc, vacc, 0.0, vl_max);
+
+//     // 5) extarct the first and save in result 
+//     double result;
+//     __riscv_vse64_v_f64m1(&result, vacc, 1);
+
+//     return result;
+// }
+
+// VLMAX = 2 
+
 void mv_ell_symmetric_full_colmajor_vector(int n,              // A matrix dimension (n x n)
                                            int max_nnz_row,    // max number of off-diagonal nnz in rows
                                            double *diag,       // dense diangonal
@@ -36,9 +91,15 @@ void mv_ell_symmetric_full_colmajor_vector(int n,              // A matrix dimen
         vfloat64m1_t vy = __riscv_vle64_v_f64m1(&y[i], vl); // should be zero, but safe, vy[i] = y[i]
 
         // perform element-wise multiplication and accumulate
-        vy = __riscv_vfmacc_vv_f64m1(vy, vdiag, vx, vl); // y[i] += diag[i] * x[i]
+        // y[i] += diag[i] * x[i]
+        // vfmacc.vv v[vy], v[vdiag], v[vx]
+        vy = __riscv_vfmacc_vv_f64m1(vy,    // destination and accumulate target
+                                     vdiag, // first input vector
+                                     vx,    // secondo input vector
+                                     vl);
 
         // store result back to y[i]
+        // vse64.v v[vy], (&y[i])
         __riscv_vse64_v_f64m1(&y[i], vy, vl); // y[i] = vy
     }
 
@@ -225,29 +286,32 @@ void mv_ell_symmetric_full_colmajor_vector_m4(int n,              // A matrix di
 
     size_t vl;
     // 2) diagonal contribution
-    for (size_t i = 0; i < (size_t)n; i += vl) {
+    for (size_t i = 0; i < (size_t)n; i += vl)
+    {
         int remaining = n - i;
         vl = __riscv_vsetvl_e64m4(remaining);
 
         vfloat64m4_t vdiag = __riscv_vle64_v_f64m4(&diag[i], vl);
-        vfloat64m4_t vx    = __riscv_vle64_v_f64m4(&x[i],    vl);
-        vfloat64m4_t vy    = __riscv_vle64_v_f64m4(&y[i],    vl);
+        vfloat64m4_t vx = __riscv_vle64_v_f64m4(&x[i], vl);
+        vfloat64m4_t vy = __riscv_vle64_v_f64m4(&y[i], vl);
 
         vy = __riscv_vfmacc_vv_f64m4(vy, vdiag, vx, vl);
         __riscv_vse64_v_f64m4(&y[i], vy, vl);
     }
 
     // 3) off-diagonal (ELL) contribution
-    for (int slot = 0; slot < max_nnz_row; ++slot) {
-        for (size_t j = 0; j < (size_t)n; j += vl) {
+    for (int slot = 0; slot < max_nnz_row; ++slot)
+    {
+        for (size_t j = 0; j < (size_t)n; j += vl)
+        {
             int remaining = n - j;
             vl = __riscv_vsetvl_e64m4(remaining);
 
             size_t base = slot * (size_t)n + j;
 
             // load values and column indices
-            vfloat64m4_t vvals   = __riscv_vle64_v_f64m4(&ell_values[base], vl);
-            vuint64m4_t  vcolidx = __riscv_vle64_v_u64m4(&ell_cols[base],   vl);
+            vfloat64m4_t vvals = __riscv_vle64_v_f64m4(&ell_values[base], vl);
+            vuint64m4_t vcolidx = __riscv_vle64_v_u64m4(&ell_cols[base], vl);
 
             // scale to byte‐offsets
             vuint64m4_t scaled_idx = __riscv_vmul_vx_u64m4(vcolidx, 8, vl);
@@ -259,9 +323,9 @@ void mv_ell_symmetric_full_colmajor_vector_m4(int n,              // A matrix di
 
             // gather x[col] under mask
             vfloat64m4_t vx_g = __riscv_vluxei64_v_f64m4_m(mask,
-                                                            x,
-                                                            scaled_idx,
-                                                            vl);
+                                                           x,
+                                                           scaled_idx,
+                                                           vl);
 
             // load y[j…]
             vfloat64m4_t vy_g = __riscv_vle64_v_f64m4(&y[j], vl);
@@ -279,7 +343,6 @@ void mv_ell_symmetric_full_colmajor_vector_m4(int n,              // A matrix di
     }
 }
 
-
 void mv_ell_symmetric_full_colmajor_vector_m8(int n,              // A matrix dimension (n x n)
                                               int max_nnz_row,    // max number of off-diagonal nnz in rows
                                               double *diag,       // dense diagonal
@@ -293,29 +356,32 @@ void mv_ell_symmetric_full_colmajor_vector_m8(int n,              // A matrix di
 
     size_t vl;
     // 2) diagonal contribution
-    for (size_t i = 0; i < (size_t)n; i += vl) {
+    for (size_t i = 0; i < (size_t)n; i += vl)
+    {
         int remaining = n - i;
         vl = __riscv_vsetvl_e64m8(remaining);
 
         vfloat64m8_t vdiag = __riscv_vle64_v_f64m8(&diag[i], vl);
-        vfloat64m8_t vx    = __riscv_vle64_v_f64m8(&x[i],    vl);
-        vfloat64m8_t vy    = __riscv_vle64_v_f64m8(&y[i],    vl);
+        vfloat64m8_t vx = __riscv_vle64_v_f64m8(&x[i], vl);
+        vfloat64m8_t vy = __riscv_vle64_v_f64m8(&y[i], vl);
 
         vy = __riscv_vfmacc_vv_f64m8(vy, vdiag, vx, vl);
         __riscv_vse64_v_f64m8(&y[i], vy, vl);
     }
 
     // 3) off-diagonal (ELL) contribution
-    for (int slot = 0; slot < max_nnz_row; ++slot) {
-        for (size_t j = 0; j < (size_t)n; j += vl) {
+    for (int slot = 0; slot < max_nnz_row; ++slot)
+    {
+        for (size_t j = 0; j < (size_t)n; j += vl)
+        {
             int remaining = n - j;
             vl = __riscv_vsetvl_e64m8(remaining);
 
             size_t base = slot * (size_t)n + j;
 
             // load ELL values and column indices
-            vfloat64m8_t vvals   = __riscv_vle64_v_f64m8(&ell_values[base], vl);
-            vuint64m8_t  vcolidx = __riscv_vle64_v_u64m8(&ell_cols[base],   vl);
+            vfloat64m8_t vvals = __riscv_vle64_v_f64m8(&ell_values[base], vl);
+            vuint64m8_t vcolidx = __riscv_vle64_v_u64m8(&ell_cols[base], vl);
 
             // scale to byte‐offsets
             vuint64m8_t scaled_idx = __riscv_vmul_vx_u64m8(vcolidx, 8, vl);
@@ -327,9 +393,9 @@ void mv_ell_symmetric_full_colmajor_vector_m8(int n,              // A matrix di
 
             // masked gather from x
             vfloat64m8_t vx_g = __riscv_vluxei64_v_f64m8_m(mask,
-                                                            x,
-                                                            scaled_idx,
-                                                            vl);
+                                                           x,
+                                                           scaled_idx,
+                                                           vl);
 
             // load y[j…]
             vfloat64m8_t vy_g = __riscv_vle64_v_f64m8(&y[j], vl);
@@ -347,8 +413,6 @@ void mv_ell_symmetric_full_colmajor_vector_m8(int n,              // A matrix di
     }
 }
 
-
-
 void mv_ell_symmetric_full_colmajor_vector_debug(int n,
                                                  int max_nnz_row, // max number of off-diagonal nnz in rows
                                                  double *diag,
@@ -357,6 +421,9 @@ void mv_ell_symmetric_full_colmajor_vector_debug(int n,
                                                  double *x,          // input vector
                                                  double *y)          // output vector
 {
+    size_t vlmax = __riscv_vsetvl_e64m1(n); // vlmax = 2
+    printf("vlmax = %zu\n", vlmax);
+
     // 1) initialize y at zero
     memset(y, 0, n * sizeof(double));
 

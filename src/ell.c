@@ -97,7 +97,7 @@ void convert_ell_full_to_dense_rowmajor(int n,
 }
 
 /*
-    Convert full-ELL (column-major) → dense
+    Convert full-ELL (column-major) -> dense
     - ell_values / ell_cols layout: slot-major (k*n + i)
 */
 void convert_ell_full_to_dense_colmajor(int n,
