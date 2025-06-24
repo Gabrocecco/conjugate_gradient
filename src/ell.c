@@ -619,27 +619,17 @@ void analyze_ell_matrix_colmajor(int n, int nnz_max,
            count_rows_with_4, n, pct4);
 }
 
-/*
-    Analyze FULL-ELL (column-major) for symmetric matrix:
-    - n        = number of rows
-    - nnz_max  = max non-zeros per row (number of “slots”)
-    - ell_values[idx]  stores the value at slot j, row i via idx = j*n + i
-    - ell_col_idx[idx] stores the corresponding column index (or –1 if padding)
-    In the FULL-ELL format all off-diagonals (i,j) and (j,i) are explicitly stored,
-    so here we just accumulate y[i] += v*x[col] (no check col>i).
-*/
 void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
                                       const double *ell_values,
                                       const int *ell_col_idx)
 {
     int padding_count = 0;
     int mismatch_count = 0;
-    int count_rows_with_1 = 0;
-    int count_rows_with_2 = 0;
-    int count_rows_with_3 = 0;
-    int count_rows_with_4 = 0;
 
-    // --- Print values row by row ---
+    // --- Statistiche per conteggio righe per numero di non-zeri reali ---
+    int *row_nnz_counts = (int *)calloc(nnz_max + 1, sizeof(int));
+
+    // --- Print valori ---
     printf("ELL-FULL values (row × slot):\n");
     for (int i = 0; i < n; ++i)
     {
@@ -658,7 +648,7 @@ void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
         printf("\n");
     }
 
-    // --- Print column-indices row by row ---
+    // --- Print colonne ---
     printf("\nELL-FULL column indices (row × slot):\n");
     for (int i = 0; i < n; ++i)
     {
@@ -670,7 +660,7 @@ void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
         printf("\n");
     }
 
-    // --- General statistics ---
+    // --- Statistiche generali ---
     int total_slots = n * nnz_max;
     double padding_pct = 100.0 * padding_count / total_slots;
     double utilization = 100.0 * (total_slots - padding_count) / total_slots;
@@ -684,7 +674,7 @@ void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
     else
         printf("Warning: %d padding entries have col_idx != -1.\n", mismatch_count);
 
-    // --- Count rows by number of real non-zero entries ---
+    // --- Conta righe per numero di non-zeri reali ---
     for (int i = 0; i < n; ++i)
     {
         int real_count = 0;
@@ -694,30 +684,25 @@ void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
             if (ell_values[idx] != 0.0)
                 real_count++;
         }
-        if (real_count == 1)
-            count_rows_with_1++;
-        else if (real_count == 2)
-            count_rows_with_2++;
-        else if (real_count == 3)
-            count_rows_with_3++;
-        else if (real_count == 4)
-            count_rows_with_4++;
+        if (real_count <= nnz_max)
+            row_nnz_counts[real_count]++;
     }
 
-    double pct1 = 100.0 * count_rows_with_1 / n;
-    double pct2 = 100.0 * count_rows_with_2 / n;
-    double pct3 = 100.0 * count_rows_with_3 / n;
-    double pct4 = 100.0 * count_rows_with_4 / n;
+    // --- Stampa distribuzione ---
+    printf("\nRow non-zero statistics:\n");
+    for (int k = nnz_max; k >= 0; --k)
+    {
+        if (row_nnz_counts[k] > 0)
+        {
+            double pct = 100.0 * row_nnz_counts[k] / n;
+            printf("Rows with exactly %d non-zeros: %d of %d (%.2f%%)\n",
+                   k, row_nnz_counts[k], n, pct);
+        }
+    }
 
-    printf("\nRows with exactly 1 non-zero: %d of %d (%.2f%%)\n",
-           count_rows_with_1, n, pct1);
-    printf("Rows with exactly 2 non-zeros: %d of %d (%.2f%%)\n",
-           count_rows_with_2, n, pct2);
-    printf("Rows with exactly 3 non-zeros: %d of %d (%.2f%%)\n",
-           count_rows_with_3, n, pct3);
-    printf("Rows with exactly 4 non-zeros: %d of %d (%.2f%%)\n",
-           count_rows_with_4, n, pct4);
+    free(row_nnz_counts);
 }
+
 
 /*
     COO -> ELL conversion for symmetric matrix: upper triangular part only

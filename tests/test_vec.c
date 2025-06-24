@@ -748,9 +748,9 @@ void test_vec_axpy_vector()
 
 int main(void)
 {
-    // test_mv_ell_vec_with_5x5_matrix();
+    test_mv_ell_vec_with_5x5_matrix();
 
-    // test_mv_ell_vec_from_coo_matrix();
+    test_mv_ell_vec_from_coo_matrix();
 
     // Seed the random number generator once
     srand((unsigned)time(NULL));
@@ -761,13 +761,13 @@ int main(void)
     // test_mv_ell_vec_from_random_coo_matrix(50, 0.02);
     // test_mv_ell_vec_from_random_coo_matrix(100, 0.30);
     // test_mv_ell_vec_from_random_coo_matrix(150, 0.10);
-    // test_mv_ell_vec_from_random_coo_matrix(200, 0.02);
+    test_mv_ell_vec_from_random_coo_matrix(200, 0.02);
 
-    // test_mv_ell_vec_from_openfoam_coo_matrix("data/data.txt");
+    test_mv_ell_vec_from_openfoam_coo_matrix("data/data.txt");
 
-    // test_mv_ell_vec_from_matrix_market("data/mkt_real_symmetric/bcsstk04.mtx");
+    test_mv_ell_vec_from_matrix_market("data/mkt_real_symmetric/bcsstk04.mtx");
 
-    // test_dot_product_vec();
+    test_dot_product_vec();
 
     test_vec_axpy_vector();
 

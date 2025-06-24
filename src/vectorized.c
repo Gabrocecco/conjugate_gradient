@@ -152,16 +152,17 @@ double vec_dot_vectorized_debug(double *a,
 void mv_ell_symmetric_full_colmajor_vector(int n,              // A matrix dimension (n x n)
                                            int max_nnz_row,    // max number of off-diagonal nnz in rows
                                            double *diag,       // dense diangonal
-                                           double *ell_values, // ELL values (size n * max_nnz_row)
+                                           double *ell_values, // ELL values all off-diagonal elements (size n * max_nnz_row)
                                            uint64_t *ell_cols, // ELL column indices (size n * max_nnz_row)
                                            double *x,          // input vector
                                            double *y)          // output vector
 {
-    // 1) initialize y at zero
+    // initialize y at zero
     memset(y, 0, n * sizeof(double));
 
+    // diagonal contributes 
     size_t vl;
-    for (size_t i = 0; i < n; i += vl)
+    for (size_t i = 0; i < n; i += vl)  // iterate for all the diagonal elements, vl at the time 
     {
         int remaining = n - i; // remaining elements to process
         // vl = max(vlmax, remaining);
@@ -187,7 +188,8 @@ void mv_ell_symmetric_full_colmajor_vector(int n,              // A matrix dimen
         __riscv_vse64_v_f64m1(&y[i], vy, vl); // y[i] = vy
     }
 
-    for (int slot = 0; slot < max_nnz_row; ++slot) // ierate slots (ELL columns) (max_nnz_row slots)
+    // off-diagonal contributes 
+    for (int slot = 0; slot < max_nnz_row; ++slot) // ierate slots (ELL columns) (there are max_nnz_row slots)
     {
         for (int j = 0; j < n; j += vl) // iterate elements in a slot (n elements for each slot)
         {
