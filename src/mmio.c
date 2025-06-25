@@ -464,6 +464,10 @@ char  *mm_typecode_to_str(MM_typecode matcode)
         types[0] = MM_MTX_STR;
     else
         error=1;
+    
+    if(error == 1){
+        printf("Error!");
+    }
 
     /* check for CRD or ARR matrix */
     if (mm_is_sparse(matcode))

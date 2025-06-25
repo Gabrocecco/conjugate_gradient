@@ -15,6 +15,11 @@ SPIKERUN     := spike --isa=rv64gcv pk
 
 BUILD_DIR=build
 
+# === Native RISC-V (Milk-V Pioneer) compilation ===
+RISCV_NATIVE_MILKV_PIONEER_CC     := gcc
+
+RISCV_NATIVE_MILKV_PIONEER_FLAGS  := -O0 -march=rv64gc_xtheadvector -mabi=lp64d -static
+
 # === Build all executables ===
 all: $(BUILD_DIR) debug release test_cg test_coo test_csr test_ell convert_foam_to_mm mm_read
 
@@ -95,14 +100,9 @@ test_cg_vec: $(BUILD_DIR)
 run_test_cg_vec: test_cg_vec
 	spike --isa=rv64gcv pk $(BUILD_DIR)/test_cg_vec
 
-# === Native RISC-V compilation ===
-RISCV_NATIVE_CC     := gcc
-
-RISCV_NATIVE_FLAGS  := -O0 -march=rv64gc_xtheadvector -mabi=lp64d -static
-
-# Native test executable for vectorized CG
+# Milk-V Pionner test executable for vectorized CG
 test_cg_vec_native: $(BUILD_DIR)
-	$(RISCV_NATIVE_CC) $(RISCV_NATIVE_FLAGS) $(CFLAGS) \
+	$(RISCV_NATIVE_MILKV_PIONEER_CC) $(RISCV_NATIVE_MILKV_PIONEER_FLAGS) $(CFLAGS) \
 		-o $(BUILD_DIR)/test_cg_vec_native \
 		src/vectorized.c \
 		src/common.c \
@@ -120,8 +120,9 @@ run_test_cg_vec_native: test_cg_vec_native
 	./$(BUILD_DIR)/test_cg_vec_native
 
 
+# Milk-V Pionner test executable for test_vec
 test_vec_native: $(BUILD_DIR)
-	$(RISCV_NATIVE_CC) $(RISCV_NATIVE_FLAGS) $(CFLAGS) \
+	$(RISCV_NATIVE_MILKV_PIONEER_CC) $(RISCV_NATIVE_MILKV_PIONEER_FLAGS) $(CFLAGS) \
 		-o $(BUILD_DIR)/test_vec_native \
 		src/vectorized.c \
 		src/ell.c \
@@ -134,6 +135,24 @@ test_vec_native: $(BUILD_DIR)
 
 run_test_vec_native: test_vec_native
 	./$(BUILD_DIR)/test_vec_native
+
+
+# Benchmarks Serial vs Vector
+
+benchmark_matvec_scalar_vs_vector: $(BUILD_DIR)
+	$(RISCV_NATIVE_MILKV_PIONEER_CC) $(RISCV_NATIVE_MILKV_PIONEER_FLAGS) $(CFLAGS) \
+		-o $(BUILD_DIR)/benchmark_matvec_scalar_vs_vector \
+		src/vectorized.c \
+		src/ell.c \
+		src/coo.c \
+		src/csr.c \
+		src/common.c \
+		src/parser.c \
+		src/mmio.c \
+		benchmarks/rvv_matrix_vector.c
+
+run_benchmark_matvec_scalar_vs_vector: benchmark_matvec_scalar_vs_vector 
+			$(SPIKERUN) $(BUILD_DIR)/benchmark_matvec_scalar_vs_vector
 
 
 # === Build directory ===
