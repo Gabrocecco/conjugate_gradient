@@ -1,7 +1,7 @@
 
 # x86 compilation  
 CC=gcc
-CFLAGS=-std=c99 -Wall -pedantic -Iinclude	# -Iinclude searches for header filers in /include
+CFLAGS=-std=c99 -fgnu89-inline  -Wall -pedantic -Iinclude	# -Iinclude searches for header filers in /include
 DEBUG_FLAGS=-O0 -g -fsanitize=address,undefined 
 OPT_FLAGS=-O3 -DNDEBUG -march=native -mtune=native
 

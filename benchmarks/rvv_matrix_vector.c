@@ -8,6 +8,7 @@
 #include <riscv_vector.h>
 #include <assert.h>
 #include <time.h>
+#include <inttypes.h>
 #include "common.h"
 #include "vectorized.h"
 #include "ell.h"
@@ -15,6 +16,12 @@
 #include "csr.h"
 #include "parser.h"
 #include "mmio.h"
+
+static inline uint64_t read_rdcycle() {
+    uint64_t cycle;
+    __asm__ volatile("rdcycle %0" : "=r"(cycle));
+    return cycle;
+}
 
 void mv_rvv_vs_scalar(int n, double sparsity)
 {
@@ -67,31 +74,47 @@ void mv_rvv_vs_scalar(int n, double sparsity)
         ell_cols64[k] = (uint64_t)ell_cols[k];
     }
 
-    // 7) Perform mat-vec: serial and vectorized
-    struct timespec start, end;
+// 7) Perform mat-vec: serial and vectorized
+struct timespec start, end;
+uint64_t start_cycles, end_cycles;
 
-    // Serial
-    clock_gettime(CLOCK_MONOTONIC, &start);
-    mv_ell_symmetric_full_colmajor_sdtint(
-        n, max_nnz,
-        diag, ell_values, ell_cols64,
-        x, y);
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double time_serial = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+// Serial
+clock_gettime(CLOCK_MONOTONIC, &start);
+start_cycles = read_rdcycle();
 
-    // Vectorized
-    clock_gettime(CLOCK_MONOTONIC, &start);
-    mv_ell_symmetric_full_colmajor_vector(
-        n, max_nnz,
-        diag, ell_values, ell_cols64,
-        x, y_vectorized);
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double time_vector = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+mv_ell_symmetric_full_colmajor_sdtint(
+    n, max_nnz,
+    diag, ell_values, ell_cols64,
+    x, y);
 
-    printf("Time serial     : %.6f s\n", time_serial);
-    printf("Time vectorized : %.6f s\n", time_vector);
-    printf("Speedup         : %.2fx\n", time_serial / time_vector);
+end_cycles = read_rdcycle();
+clock_gettime(CLOCK_MONOTONIC, &end);
 
+double time_serial = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+uint64_t cycles_serial = end_cycles - start_cycles;
+
+// Vectorized
+clock_gettime(CLOCK_MONOTONIC, &start);
+start_cycles = read_rdcycle();
+
+mv_ell_symmetric_full_colmajor_vector(
+    n, max_nnz,
+    diag, ell_values, ell_cols64,
+    x, y_vectorized);
+
+end_cycles = read_rdcycle();
+clock_gettime(CLOCK_MONOTONIC, &end);
+
+double time_vector = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+uint64_t cycles_vector = end_cycles - start_cycles;
+
+// Output
+printf("Time serial     : %.6f s\n", time_serial);
+printf("Time vectorized : %.6f s\n", time_vector);
+printf("Speedup (time)  : %.2fx\n", time_serial / time_vector);
+printf("Cycles serial   : %" PRIu64 "\n", cycles_serial);
+printf("Cycles vector   : %" PRIu64 "\n", cycles_vector);
+printf("Speedup (cycles): %.2fx\n", (double)cycles_serial / (double)cycles_vector);
     // 8) Print results side by side
     // puts(" y (serial)   |  y (vectorized)");
     // for (int i = 0; i < n; ++i) {
@@ -207,11 +230,27 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
 
 int main(void)
 {
-    //mv_rvv_vs_scalar(32768, 0.01);
-    //mv_rvv_vs_scalar(32768, 0.05);
-    //mv_rvv_vs_scalar(32768, 0.10);
+
+    mv_rvv_vs_scalar(1024, 0.01);
+    mv_rvv_vs_scalar(2048, 0.01);
+    mv_rvv_vs_scalar(4096, 0.01);
+    mv_rvv_vs_scalar(8192, 0.01);
+    mv_rvv_vs_scalar(16384, 0.01);
     mv_rvv_vs_scalar(32768, 0.01);
 
-   // test_mv_ell_vec_from_openfoam_coo_matrix("data/foam_128k.txt");
+    mv_rvv_vs_scalar(1024, 0.02);
+    mv_rvv_vs_scalar(2048, 0.02);
+    mv_rvv_vs_scalar(4096, 0.02);
+    mv_rvv_vs_scalar(8192, 0.02);
+    mv_rvv_vs_scalar(16384, 0.02);
+    mv_rvv_vs_scalar(32768, 0.02);
+
+    mv_rvv_vs_scalar(1024, 0.05);
+    mv_rvv_vs_scalar(2048, 0.05);
+    mv_rvv_vs_scalar(4096, 0.05);
+    mv_rvv_vs_scalar(8192, 0.05);
+    mv_rvv_vs_scalar(16384, 0.05);
+    mv_rvv_vs_scalar(32768, 0.05);
+    // test_mv_ell_vec_from_openfoam_coo_matrix("data/foam_128k.txt");
     return 0;
 }
