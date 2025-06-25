@@ -157,6 +157,27 @@ run_benchmark_matvec_scalar_vs_vector: benchmark_matvec_scalar_vs_vector
 			$(BUILD_DIR)/benchmark_matvec_scalar_vs_vector
 
 
+# Milk-V Pioneer test CG scalar vs vector
+benchmark_cg_scalar_vs_vector_native: $(BUILD_DIR)
+	$(RISCV_NATIVE_MILKV_PIONEER_CC) $(RISCV_NATIVE_MILKV_PIONEER_FLAGS) $(CFLAGS) \
+		-o $(BUILD_DIR)/benchmark_cg_scalar_vs_vector_native \
+		src/vectorized.c \
+		src/common.c \
+		src/cg_vec.c \
+		src/cg.c \
+		src/vec.c \
+		src/coo.c \
+		src/csr.c \
+		src/ell.c \
+		src/utils.c \
+		src/parser.c \
+		src/mmio.c \
+		benchmarks/rvv_cg.c \
+		-lm
+
+run_benchmark_cg_scalar_vs_vector_native: benchmark_cg_scalar_vs_vector_native
+	./$(BUILD_DIR)/benchmark_cg_scalar_vs_vector_native
+
 # === Build directory ===
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

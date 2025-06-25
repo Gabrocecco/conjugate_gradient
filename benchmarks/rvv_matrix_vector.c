@@ -207,11 +207,11 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
 
 int main(void)
 {
-    //int n = 32768;
-    //double sparsity = 0.01;
-    //mv_rvv_vs_scalar(n, sparsity);
+    //mv_rvv_vs_scalar(32768, 0.01);
+    //mv_rvv_vs_scalar(32768, 0.05);
+    //mv_rvv_vs_scalar(32768, 0.10);
+    mv_rvv_vs_scalar(32768, 0.01);
 
-
-    test_mv_ell_vec_from_openfoam_coo_matrix("data/matrix_128k_mm_upper.txt");
+   // test_mv_ell_vec_from_openfoam_coo_matrix("data/foam_128k.txt");
     return 0;
 }
