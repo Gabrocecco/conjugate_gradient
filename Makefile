@@ -18,7 +18,7 @@ BUILD_DIR=build
 # === Native RISC-V (Milk-V Pioneer) compilation ===
 RISCV_NATIVE_MILKV_PIONEER_CC     := gcc
 
-RISCV_NATIVE_MILKV_PIONEER_FLAGS  := -O0 -march=rv64gc_xtheadvector -mabi=lp64d -static
+RISCV_NATIVE_MILKV_PIONEER_FLAGS  := -O3 -march=rv64gc_xtheadvector -mabi=lp64d 
 
 # === Build all executables ===
 all: $(BUILD_DIR) debug release test_cg test_coo test_csr test_ell convert_foam_to_mm mm_read
@@ -149,10 +149,12 @@ benchmark_matvec_scalar_vs_vector: $(BUILD_DIR)
 		src/common.c \
 		src/parser.c \
 		src/mmio.c \
-		benchmarks/rvv_matrix_vector.c
+		benchmarks/rvv_matrix_vector.c \
+		-lrt 
+              
 
 run_benchmark_matvec_scalar_vs_vector: benchmark_matvec_scalar_vs_vector 
-			$(SPIKERUN) $(BUILD_DIR)/benchmark_matvec_scalar_vs_vector
+			$(BUILD_DIR)/benchmark_matvec_scalar_vs_vector
 
 
 # === Build directory ===
