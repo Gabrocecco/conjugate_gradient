@@ -95,6 +95,46 @@ test_cg_vec: $(BUILD_DIR)
 run_test_cg_vec: test_cg_vec
 	spike --isa=rv64gcv pk $(BUILD_DIR)/test_cg_vec
 
+# === Native RISC-V compilation ===
+RISCV_NATIVE_CC     := gcc
+
+RISCV_NATIVE_FLAGS  := -O0 -march=rv64gc_xtheadvector -mabi=lp64d -static
+
+# Native test executable for vectorized CG
+test_cg_vec_native: $(BUILD_DIR)
+	$(RISCV_NATIVE_CC) $(RISCV_NATIVE_FLAGS) $(CFLAGS) \
+		-o $(BUILD_DIR)/test_cg_vec_native \
+		src/vectorized.c \
+		src/common.c \
+		src/cg_vec.c \
+		src/vec.c \
+		src/coo.c \
+		src/csr.c \
+		src/ell.c \
+		src/utils.c \
+		src/parser.c \
+		tests/test_cg_vec.c \
+		-lm
+
+run_test_cg_vec_native: test_cg_vec_native
+	./$(BUILD_DIR)/test_cg_vec_native
+
+
+test_vec_native: $(BUILD_DIR)
+	$(RISCV_NATIVE_CC) $(RISCV_NATIVE_FLAGS) $(CFLAGS) \
+		-o $(BUILD_DIR)/test_vec_native \
+		src/vectorized.c \
+		src/ell.c \
+		src/coo.c \
+		src/csr.c \
+		src/common.c \
+		src/parser.c \
+		src/mmio.c \
+		tests/test_vec.c
+
+run_test_vec_native: test_vec_native
+	./$(BUILD_DIR)/test_vec_native
+
 
 # === Build directory ===
 $(BUILD_DIR):
