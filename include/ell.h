@@ -161,7 +161,7 @@ void analyze_ell_matrix_colmajor(int n, int nnz_max,
                                  const double *ell_values,
                                  const int *ell_col_idx);
 
-void analyze_ell_matrix_full_colmajor(int n, int nnz_max,
+int analyze_ell_matrix_full_colmajor(int n, int nnz_max,
                                       const double *ell_values,
                                       const int *ell_col_idx);
 
