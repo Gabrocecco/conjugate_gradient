@@ -4,6 +4,8 @@
 #include <math.h>
 #include <riscv_vector.h>
 
+void saxpy_vec_tutorial_double(size_t n, const double a, const double *x, double *y);
+
 void saxpy_vec_tutorial(size_t n, const float a, const float *x, float *y);
 
 double vec_dot_vectorized(double *a,

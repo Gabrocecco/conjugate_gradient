@@ -27,7 +27,7 @@ static inline uint64_t read_rdcycle()
 void mv_rvv_vs_scalar(int n, double sparsity)
 {
     // --- Open file and write CSV header if file is empty ---
-    FILE *out = fopen("scripts/data/mv_prof_random.csv", "a");
+    FILE *out = fopen("scripts/data/mv_prof_random_O0.csv", "a");
     assert(out && "Unable to open output file");
 
     // Check if file is empty, then write header
@@ -156,7 +156,7 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
     printf("nnz_max = %d\n", nnz_max);
 
     // --- Open file and write CSV header if file is empty ---
-    FILE *out = fopen("scripts/data/mv_prof_foam.csv", "a");
+    FILE *out = fopen("scripts/data/mv_prof_foam_O0.csv", "a");
     assert(out && "Unable to open output file");
 
     // Check if file is empty, then write header
@@ -262,7 +262,7 @@ void saxpy_vec_tutorial(size_t n, const float a, const float *x, float *y) {
   }
 }
 */
-void saxpy_golden(size_t n, const float a, const float *x, float *y)
+void saxpy_golden(size_t n, double a, double *x, double *y)
 {
     for (size_t i = 0; i < n; ++i)
     {
@@ -273,7 +273,7 @@ void saxpy_golden(size_t n, const float a, const float *x, float *y)
 int tutorial_saxpy_speedup(size_t n)
 {
     // --- Open file and write CSV header if file is empty ---
-    FILE *out = fopen("scripts/data/saxpy_prof.csv", "a");
+    FILE *out = fopen("scripts/data/saxpy_prof_O3_switched.csv", "a");
     assert(out && "Unable to open output file");
 
     // Check if file is empty, then write header
@@ -287,32 +287,23 @@ int tutorial_saxpy_speedup(size_t n)
 
     // generate random data
     // size_t n = 1024 * 1024; // 1 million elements
-    float *x = malloc(n * sizeof(float));
-    float *y = malloc(n * sizeof(float));
-    float a = 2.0f; // scalar multiplier
+    double *x = malloc(n * sizeof(double));
+    double *y = malloc(n * sizeof(double));
+    double a = 2.0f; // scalar multiplier
 
     for (size_t i = 0; i < n; ++i)
     {
-        x[i] = rand() / (float)RAND_MAX;
-        y[i] = rand() / (float)RAND_MAX;
+        x[i] = rand() / (double)RAND_MAX;
+        y[i] = rand() / (double)RAND_MAX;
     }
 
     // copy y to to y_vectorized
-    float *y_vectorized = malloc(n * sizeof(float));
+    double *y_vectorized = malloc(n * sizeof(double));
     memcpy(y_vectorized, y, n * sizeof(double));
 
     // Measure time for vectorized SAXPY
     struct timespec start, end;
     uint64_t start_cycles, end_cycles;
-
-    clock_gettime(CLOCK_MONOTONIC, &start);
-    start_cycles = read_rdcycle();
-    saxpy_vec_tutorial(n, a, x, y_vectorized);
-    end_cycles = read_rdcycle();
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double time_vectorized = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
-
-    printf("Vectorized SAXPY time: %.6f seconds\n", time_vectorized);
 
     // Measure time for scalar SAXPY
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -321,6 +312,16 @@ int tutorial_saxpy_speedup(size_t n)
     end_cycles = read_rdcycle();
     clock_gettime(CLOCK_MONOTONIC, &end);
     double time_scalar = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+    uint64_t cycles_scalar = end_cycles - start_cycles;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    start_cycles = read_rdcycle();
+    saxpy_vec_tutorial_double(n, a, x, y_vectorized);
+    end_cycles = read_rdcycle();
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    double time_vectorized = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+    uint64_t cycles_vector = end_cycles - start_cycles;
+    printf("Vectorized SAXPY time: %.6f seconds\n", time_vectorized);
 
     // --- Check result ---
     int pass = 1;
@@ -336,9 +337,9 @@ int tutorial_saxpy_speedup(size_t n)
     printf("Scalar SAXPY time: %.6f seconds\n", time_scalar);
     double speedup = time_scalar / time_vectorized;
     printf("Speedup: %.2fx\n", speedup);
-    printf("Cycles scalar: %" PRIu64 "\n", end_cycles - start_cycles);
-    printf("Cycles vectorized: %" PRIu64 "\n", end_cycles - start_cycles);
-    printf("Speedup (cycles): %.2fx\n", (double)(end_cycles - start_cycles) / (double)(end_cycles - start_cycles));
+    printf("Cycles scalar: %" PRIu64 "\n", cycles_scalar);
+    printf("Cycles vectorized: %" PRIu64 "\n", cycles_vector);
+    printf("Speedup (cycles): %.2fx\n", (double)(cycles_scalar) / (double)(cycles_vector));
     printf("%s\n\n", pass ? "PASS: Results match!" : "FAIL: Results do NOT match!");
 
     // save to CSV
@@ -346,9 +347,9 @@ int tutorial_saxpy_speedup(size_t n)
             n,
             time_scalar, time_vectorized,
             speedup,
-            end_cycles - start_cycles, // cycles scalar
-            end_cycles - start_cycles, // cycles vectorized
-            (double)(end_cycles - start_cycles) / (double)(end_cycles - start_cycles),
+            cycles_scalar, // cycles scalar
+            cycles_vector, // cycles vectorized
+            (double)(cycles_scalar) / (double)(cycles_vector),
             pass ? "PASS" : "FAIL");
 
     // Free allocated memory
@@ -360,24 +361,30 @@ int tutorial_saxpy_speedup(size_t n)
 
 int main(void)
 {
-    // double sparsity_levels[] = {0.01, 0.02, 0.05, 0.1, 0.2};
-    // int sizes[] = {1024, 2048, 4096, 8192, 16384, 32768};
+/*
+     double sparsity_levels[] = {0.01, 0.02, 0.05, 0.1, 0.2};
+     int sizes[] = {1024, 2048, 4096, 8192, 16384, 32768};
 
-    // for (int i = 0; i < sizeof(sparsity_levels) / sizeof(sparsity_levels[0]); ++i)
-    // {
-    //     for (int j = 0; j < sizeof(sizes) / sizeof(sizes[0]); ++j)
-    //     {
-    //         mv_rvv_vs_scalar(sizes[j], sparsity_levels[i]);
-    //     }
-    // }
+     for (int i = 0; i < sizeof(sparsity_levels) / sizeof(sparsity_levels[0]); ++i)
+     {
+         for (int j = 0; j < sizeof(sizes) / sizeof(sizes[0]); ++j)
+         {
+             mv_rvv_vs_scalar(sizes[j], sparsity_levels[i]);
+         }
+     }
 
-    // test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/2000.system");
-    // test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/8000.system");
-    // test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/32k.system");
-    // test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/128k.system");
+     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/2000.system");
+     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/8000.system");
+     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/32k.system");
+     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/128k.system");
+*/
 
-    tutorial_saxpy_speedup(1024 * 1024);     // 1 million elements
-    tutorial_saxpy_speedup(1024 * 1024 * 8); // 8 million elements
+//    tutorial_saxpy_speedup(1024 * 1024);     // 1 million elements
+    int sizes_saxpy[] = {1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576};  
+    printf("%lu \n", sizeof(sizes_saxpy));
+    for (int i = 0; i < sizeof(sizes_saxpy) / sizeof(sizes_saxpy[0]); i++){
+	tutorial_saxpy_speedup(sizes_saxpy[i]);
+	}    
 
     return 0;
 }

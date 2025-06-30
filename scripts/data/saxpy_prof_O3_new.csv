@@ -1,0 +1,2 @@
+n,time_serial,time_vectorized,speedup_time,cycles_serial,cycles_vector,speedup_cycles,pass
+1048576,0.002919,0.002822,1.03,5832821,5639944,1.03,PASS

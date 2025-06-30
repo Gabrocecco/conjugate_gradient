@@ -55,6 +55,15 @@ void saxpy_vec_tutorial(size_t n, const float a, const float *x, float *y) {
   }
 }
 
+void saxpy_vec_tutorial_double(size_t n, const double a, const double *x, double *y) {
+  for (size_t vl; n > 0; n -= vl, x += vl, y += vl) {
+    vl = __riscv_vsetvl_e64m1(n);
+    vfloat64m1_t vx = __riscv_vle64_v_f64m1(x, vl);
+    vfloat64m1_t vy = __riscv_vle64_v_f64m1(y, vl);
+    __riscv_vse64_v_f64m1(y, __riscv_vfmacc_vf_f64m1(vy, a, vx, vl), vl);
+  }
+}
+
 void vec_axpy_vectorized_debug(double *a, double *b, double alpha, double *out, int n)
 {
     size_t vl;
