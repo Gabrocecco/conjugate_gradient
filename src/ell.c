@@ -619,7 +619,7 @@ void analyze_ell_matrix_colmajor(int n, int nnz_max,
            count_rows_with_4, n, pct4);
 }
 
-int analyze_ell_matrix_full_colmajor(int n, int nnz_max,
+double analyze_ell_matrix_full_colmajor(int n, int nnz_max,
                                       const double *ell_values,
                                       const int *ell_col_idx)
 {
@@ -629,36 +629,36 @@ int analyze_ell_matrix_full_colmajor(int n, int nnz_max,
     // --- Statistiche per conteggio righe per numero di non-zeri reali ---
     int *row_nnz_counts = (int *)calloc(nnz_max + 1, sizeof(int));
 
-    // // --- Print valori ---
-    // printf("ELL-FULL values (row × slot):\n");
-    // for (int i = 0; i < n; ++i)
-    // {
-    //     for (int j = 0; j < nnz_max; ++j)
-    //     {
-    //         int idx = j * n + i;
-    //         double v = ell_values[idx];
+    // --- Print valori ---
+    //printf("ELL-FULL values (row × slot):\n");
+    for (int i = 0; i < n; ++i)
+    {
+        for (int j = 0; j < nnz_max; ++j)
+        {
+             int idx = j * n + i;
+             double v = ell_values[idx];
     //         printf("%8.2f ", v);
-    //         if (v == 0.0)
-    //         {
-    //             padding_count++;
-    //             if (ell_col_idx[idx] != -1)
-    //                 mismatch_count++;
-    //         }
-    //     }
+             if (v == 0.0)
+             {
+                 padding_count++;
+                 if (ell_col_idx[idx] != -1)
+                     mismatch_count++;
+             }
+         }
     //     printf("\n");
-    // }
+     }
 
-    // // --- Print colonne ---
+    // --- Print colonne ---
     // printf("\nELL-FULL column indices (row × slot):\n");
-    // for (int i = 0; i < n; ++i)
-    // {
-    //     for (int j = 0; j < nnz_max; ++j)
-    //     {
-    //         int idx = j * n + i;
-    //         printf("%4d ", ell_col_idx[idx]);
-    //     }
-    //     printf("\n");
-    // }
+//    for (int i = 0; i < n; ++i)
+//    {
+//         for (int j = 0; j < nnz_max; ++j)
+//         {
+//             int idx = j * n + i;
+//             printf("%4d ", ell_col_idx[idx]);
+//         }
+//         printf("\n");
+//     }
 
     // --- Statistiche generali ---
     int total_slots = n * nnz_max;
@@ -703,7 +703,8 @@ int analyze_ell_matrix_full_colmajor(int n, int nnz_max,
     free(row_nnz_counts);
 
     // return sparsity number (example 0.01 means 1% of the matrix is non-zero)
-    return padding_count / total_slots;
+    printf("Sparsity %1.6f \n", (double)padding_count/total_slots);
+    return (double)padding_count/total_slots;
 }
 
 

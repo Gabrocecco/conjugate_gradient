@@ -27,7 +27,7 @@ static inline uint64_t read_rdcycle()
 void mv_rvv_vs_scalar(int n, double sparsity)
 {
     // --- Open file and write CSV header if file is empty ---
-    FILE *out = fopen("profiling_results.csv", "a");
+    FILE *out = fopen("scripts/data/mv_prof_random.csv", "a");
     assert(out && "Unable to open output file");
 
     // Check if file is empty, then write header
@@ -153,7 +153,7 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
     printf("nnz_max = %d\n", nnz_max);
 
     // --- Open file and write CSV header if file is empty ---
-    FILE *out = fopen("profiling_results_foam.csv", "a");
+    FILE *out = fopen("scripts/data/mv_prof_foam.csv", "a");
     assert(out && "Unable to open output file");
 
     // Check if file is empty, then write header
@@ -168,7 +168,7 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
     double *ell_values = malloc(nnz_max * n * sizeof(double));
     int *ell_col_idx = malloc(nnz_max * n * sizeof(int));
     coo_to_ell_symmetric_full_colmajor(n, count_upper, upper, coo_rows, coo_cols, ell_values, ell_col_idx, nnz_max);
-    int sparsity = analyze_ell_matrix_full_colmajor(n, nnz_max, ell_values, ell_col_idx);
+    double sparsity = analyze_ell_matrix_full_colmajor(n, nnz_max, ell_values, ell_col_idx);
 
     uint64_t *ell_cols64 = malloc(nnz_max * n * sizeof(uint64_t));
     for (int k = 0; k < nnz_max * n; ++k)
@@ -261,10 +261,10 @@ int main(void)
     //     }
     // }
 
-    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/2000.system.txt");
-    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/8000.system.txt");
-    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/32k.system.txt");
-    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/128k.system.txt");
+    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/2000.system");
+    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/8000.system");
+    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/32k.system");
+    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/128k.system");
 
     return 0;
 }
