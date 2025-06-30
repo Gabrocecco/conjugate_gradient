@@ -122,8 +122,8 @@ void mv_rvv_vs_scalar(int n, double sparsity)
     free(x); free(y); free(y_vectorized);
 }
 
-int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
-{
+int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename){
+    
     printf("Loading input data system from file...\n");
 
     FILE *file = fopen(filename, "r");
@@ -160,28 +160,25 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
     for (int i = 0; i < n; ++i)
         x[i] = rand() / (double)RAND_MAX;
 
-    struct timespec t0, t1;
-
     // --- Serial ---
-    clock_gettime(CLOCK_MONOTONIC, &t0);
-
+    struct timespec start, end;
+    uint64_t start_cycles, end_cycles;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    start_cycles = read_rdcycle();
     mv_ell_symmetric_full_colmajor_sdtint(n, nnz_max, diag, ell_values, ell_cols64, x, y);
-
-    clock_gettime(CLOCK_MONOTONIC, &t1);
-    double time_serial = (t1.tv_sec - t0.tv_sec) + 1e-9 * (t1.tv_nsec - t0.tv_nsec);
+    end_cycles = read_rdcycle();
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    double time_serial = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+    uint64_t cycles_serial = end_cycles - start_cycles;
 
     // --- Vectorized ---
-    clock_gettime(CLOCK_MONOTONIC, &t0);
-
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    start_cycles = read_rdcycle();
     mv_ell_symmetric_full_colmajor_vector(n, nnz_max, diag, ell_values, ell_cols64, x, y_vectorized);
-
-    clock_gettime(CLOCK_MONOTONIC, &t1);
-    double time_vector = (t1.tv_sec - t0.tv_sec) + 1e-9 * (t1.tv_nsec - t0.tv_nsec);
-
-    // --- Output ---
-    printf("Time serial     : %.6f s\n", time_serial);
-    printf("Time vectorized : %.6f s\n", time_vector);
-    printf("Speedup (time)  : %.2fx\n", time_serial / time_vector);
+    end_cycles = read_rdcycle();
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    double time_vector = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+    uint64_t cycles_vector = end_cycles - start_cycles;
 
     // --- Check result ---
     int pass = 1;
@@ -193,6 +190,13 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
             break;
         }
     }
+        // --- Output ---
+    printf("Time serial     : %.6f s\n", time_serial);
+    printf("Time vectorized : %.6f s\n", time_vector);
+    printf("Speedup (time)  : %.2fx\n", time_serial / time_vector);
+    printf("Cycles serial   : %" PRIu64 "\n", cycles_serial);
+    printf("Cycles vector   : %" PRIu64 "\n", cycles_vector);
+    printf("Speedup (cycles): %.2fx\n", (double)cycles_serial / (double)cycles_vector);
     printf("%s\n\n", pass ? "PASS: Results match!" : "FAIL: Results do NOT match!");
 
     // --- Cleanup ---
