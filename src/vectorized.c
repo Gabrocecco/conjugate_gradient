@@ -45,6 +45,16 @@ void vec_axpy_vectorized(double *a, double *b, double alpha, double *out, int n)
     }
 }
 
+// Official vectorized version of SAXPY from tutorial
+void saxpy_vec_tutorial(size_t n, const float a, const float *x, float *y) {
+  for (size_t vl; n > 0; n -= vl, x += vl, y += vl) {
+    vl = __riscv_vsetvl_e32m8(n);
+    vfloat32m8_t vx = __riscv_vle32_v_f32m8(x, vl);
+    vfloat32m8_t vy = __riscv_vle32_v_f32m8(y, vl);
+    __riscv_vse32_v_f32m8(y, __riscv_vfmacc_vf_f32m8(vy, a, vx, vl), vl);
+  }
+}
+
 void vec_axpy_vectorized_debug(double *a, double *b, double alpha, double *out, int n)
 {
     size_t vl;

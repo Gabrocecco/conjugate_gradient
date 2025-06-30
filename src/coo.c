@@ -35,7 +35,7 @@ void generate_sparse_symmetric_coo(int n, double sparsity,
                                   int **coo_cols,
                                   double **diagonal)
 {
-    // 1) alloca la diagonale e popolala
+    // 1) allocate and populate diagonal 
     *diagonal = malloc(n * sizeof(double));
     if (!*diagonal) { perror("malloc diagonal"); exit(EXIT_FAILURE); }
     for (int i = 0; i < n; ++i)
