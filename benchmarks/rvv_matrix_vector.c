@@ -24,10 +24,24 @@ static inline uint64_t read_rdcycle()
     return cycle;
 }
 
-void mv_rvv_vs_scalar(int n, double sparsity)
+const size_t n = 100 * 1000 * 1000;
+
+#define N 100 * 1000 * 1000
+int garbage[N];
+
+void flush_cache_by_accessing_garbage()
+{
+    assert(n * sizeof(garbage[0]) >= 64 * 1000 * 1000);
+    for (size_t i = 0; i < n; ++i)
+    {
+        garbage[i] += i;
+    }
+}
+
+void mv_rvv_vs_scalar(int n, double sparsity, int N_TESTS)
 {
     // --- Open file and write CSV header if file is empty ---
-    FILE *out = fopen("scripts/data/mv_prof_random_O0.csv", "a");
+    FILE *out = fopen("scripts/data/mv_prof_random_O3_avg.csv", "a");
     assert(out && "Unable to open output file");
 
     // Check if file is empty, then write header
@@ -68,25 +82,49 @@ void mv_rvv_vs_scalar(int n, double sparsity)
     for (int i = 0; i < n * max_nnz; ++i)
         ell_cols64[i] = (uint64_t)ell_cols[i];
 
-    // --- Serial ---
+    // repeat test for N_TESTS times
     struct timespec start, end;
     uint64_t start_cycles, end_cycles;
-    clock_gettime(CLOCK_MONOTONIC, &start);
-    start_cycles = read_rdcycle();
-    mv_ell_symmetric_full_colmajor_sdtint(n, max_nnz, diag, ell_values, ell_cols64, x, y);
-    end_cycles = read_rdcycle();
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double time_serial = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
-    uint64_t cycles_serial = end_cycles - start_cycles;
+    uint64_t cycles_serial = 0;
+    uint64_t cycles_vector = 0;
+    double time_serial = 0.0;
+    double time_vector = 0.0;
+
+    // --- Serial ---
+    for (int i = 0; i < N_TESTS; i++)
+    {
+        //! flush cache
+        flush_cache_by_accessing_garbage();
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        start_cycles = read_rdcycle();
+        mv_ell_symmetric_full_colmajor_sdtint(n, max_nnz, diag, ell_values, ell_cols64, x, y);
+        end_cycles = read_rdcycle();
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        time_serial += (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+        cycles_serial += end_cycles - start_cycles;
+    }
+
+    // take average of N_TESTS
+    const double cycles_serial_mean = (double)cycles_serial / N_TESTS;
+    const double time_serial_mean = (double)time_serial / N_TESTS;
 
     // --- Vectorized ---
-    clock_gettime(CLOCK_MONOTONIC, &start);
-    start_cycles = read_rdcycle();
-    mv_ell_symmetric_full_colmajor_vector(n, max_nnz, diag, ell_values, ell_cols64, x, y_vectorized);
-    end_cycles = read_rdcycle();
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double time_vector = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
-    uint64_t cycles_vector = end_cycles - start_cycles;
+    for (int i = 0; i < N_TESTS; i++)
+    {
+        //! flush cache
+        flush_cache_by_accessing_garbage();
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        start_cycles = read_rdcycle();
+        mv_ell_symmetric_full_colmajor_vector(n, max_nnz, diag, ell_values, ell_cols64, x, y_vectorized);
+        end_cycles = read_rdcycle();
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        time_vector += (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+        cycles_vector += end_cycles - start_cycles;
+    }
+
+    // take average on N_TESTS
+    const double cycles_vector_mean = (double)cycles_vector / N_TESTS;
+    const double time_vector_mean = (double)time_vector / N_TESTS;
 
     // --- Compare results ---
     int pass = 1;
@@ -100,21 +138,21 @@ void mv_rvv_vs_scalar(int n, double sparsity)
     }
 
     // --- Report ---
-    printf("Time serial     : %.6f s\n", time_serial);
-    printf("Time vectorized : %.6f s\n", time_vector);
-    printf("Speedup (time)  : %.2fx\n", time_serial / time_vector);
-    printf("Cycles serial   : %" PRIu64 "\n", cycles_serial);
-    printf("Cycles vector   : %" PRIu64 "\n", cycles_vector);
-    printf("Speedup (cycles): %.2fx\n", (double)cycles_serial / (double)cycles_vector);
+    printf("Time serial     : %.6f s\n", time_serial_mean);
+    printf("Time vectorized : %.6f s\n", time_vector_mean);
+    printf("Speedup (time)  : %.2fx\n", time_serial_mean / time_vector_mean);
+    printf("Cycles serial   : %.2f\n", cycles_serial_mean);
+    printf("Cycles vector   : %.2f \n", cycles_vector_mean);
+    printf("Speedup (cycles): %.2fx\n", cycles_serial_mean / cycles_vector_mean);
     printf("%s\n\n", pass ? "PASS: Results match!" : "FAIL: Results do NOT match!");
 
     // --- Save to CSV ---
     fprintf(out, "%d,%.4f,%d,%.6f,%.6f,%.2f,%" PRIu64 ",%" PRIu64 ",%.2f,%s\n",
             n, sparsity, max_nnz,
-            time_serial, time_vector,
-            time_serial / time_vector,
-            cycles_serial, cycles_vector,
-            (double)cycles_serial / (double)cycles_vector,
+            time_serial_mean, time_vector_mean,
+            time_serial_mean / time_vector_mean,
+            cycles_serial_mean, cycles_vector_mean,
+            (double)cycles_serial_mean / (double)cycles_vector_mean,
             pass ? "PASS" : "FAIL");
 
     fclose(out);
@@ -132,7 +170,7 @@ void mv_rvv_vs_scalar(int n, double sparsity)
     free(y_vectorized);
 }
 
-int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
+int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename, int N_TESTS)
 {
 
     printf("Loading input data system from file...\n");
@@ -156,7 +194,7 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
     printf("nnz_max = %d\n", nnz_max);
 
     // --- Open file and write CSV header if file is empty ---
-    FILE *out = fopen("scripts/data/mv_prof_foam_O0.csv", "a");
+    FILE *out = fopen("scripts/data/mv_prof_foam_O3_avg.csv", "a");
     assert(out && "Unable to open output file");
 
     // Check if file is empty, then write header
@@ -184,25 +222,49 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
     for (int i = 0; i < n; ++i)
         x[i] = rand() / (double)RAND_MAX;
 
-    // --- Serial ---
+
     struct timespec start, end;
     uint64_t start_cycles, end_cycles;
-    clock_gettime(CLOCK_MONOTONIC, &start);
-    start_cycles = read_rdcycle();
-    mv_ell_symmetric_full_colmajor_sdtint(n, nnz_max, diag, ell_values, ell_cols64, x, y);
-    end_cycles = read_rdcycle();
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double time_serial = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
-    uint64_t cycles_serial = end_cycles - start_cycles;
+    double time_serial = 0.0;
+    double time_vector = 0.0;
+    uint64_t cycles_serial = 0;
+    uint64_t cycles_vector = 0;
+
+    // --- Serial ---
+    for (int i = 0; i < N_TESTS; i++)
+    {
+        flush_cache_by_accessing_garbage();
+        struct timespec start, end;
+        uint64_t start_cycles, end_cycles;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        start_cycles = read_rdcycle();
+        mv_ell_symmetric_full_colmajor_sdtint(n, nnz_max, diag, ell_values, ell_cols64, x, y);
+        end_cycles = read_rdcycle();
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        time_serial += (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+        cycles_serial += end_cycles - start_cycles;
+    }
+
+    // take average of N_TESTS
+    const double cycles_serial_mean = (double)cycles_serial / N_TESTS;
+    const double time_serial_mean = time_serial / N_TESTS;
 
     // --- Vectorized ---
-    clock_gettime(CLOCK_MONOTONIC, &start);
-    start_cycles = read_rdcycle();
-    mv_ell_symmetric_full_colmajor_vector(n, nnz_max, diag, ell_values, ell_cols64, x, y_vectorized);
-    end_cycles = read_rdcycle();
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double time_vector = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
-    uint64_t cycles_vector = end_cycles - start_cycles;
+    for (int i = 0; i < N_TESTS; i++)
+    {
+        flush_cache_by_accessing_garbage();
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        start_cycles = read_rdcycle();
+        mv_ell_symmetric_full_colmajor_vector(n, nnz_max, diag, ell_values, ell_cols64, x, y_vectorized);
+        end_cycles = read_rdcycle();
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        time_vector += (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+        cycles_vector += end_cycles - start_cycles;
+    }
+
+    // take average on N_TESTS
+    const double cycles_vector_mean = (double)cycles_vector / N_TESTS;
+    const double time_vector_mean = time_vector / N_TESTS;
 
     // --- Check result ---
     int pass = 1;
@@ -215,21 +277,21 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
         }
     }
     // --- Output ---
-    printf("Time serial     : %.6f s\n", time_serial);
-    printf("Time vectorized : %.6f s\n", time_vector);
-    printf("Speedup (time)  : %.2fx\n", time_serial / time_vector);
-    printf("Cycles serial   : %" PRIu64 "\n", cycles_serial);
-    printf("Cycles vector   : %" PRIu64 "\n", cycles_vector);
-    printf("Speedup (cycles): %.2fx\n", (double)cycles_serial / (double)cycles_vector);
+    printf("Time serial     : %.6f s\n", time_serial_mean);
+    printf("Time vectorized : %.6f s\n", time_vector_mean);
+    printf("Speedup (time)  : %.2fx\n", time_serial_mean / time_vector_mean);
+    printf("Cycles serial   : %" PRIu64 "\n", cycles_serial_mean);
+    printf("Cycles vector   : %" PRIu64 "\n", cycles_vector_mean);
+    printf("Speedup (cycles): %.2fx\n", cycles_serial_mean / cycles_vector_mean);
     printf("%s\n\n", pass ? "PASS: Results match!" : "FAIL: Results do NOT match!");
 
     // --- Save to CSV ---
     fprintf(out, "%d,%.4f,%d,%.6f,%.6f,%.2f,%" PRIu64 ",%" PRIu64 ",%.2f,%s\n",
             n, sparsity, nnz_max,
-            time_serial, time_vector,
-            time_serial / time_vector,
-            cycles_serial, cycles_vector,
-            (double)cycles_serial / (double)cycles_vector,
+            time_serial_mean, time_vector_mean,
+            time_serial_mean / time_vector_mean,
+            cycles_serial_mean, cycles_vector_mean,
+            cycles_serial_mean / cycles_vector_mean,
             pass ? "PASS" : "FAIL");
 
     fclose(out);
@@ -270,10 +332,10 @@ void saxpy_golden(size_t n, double a, double *x, double *y)
     }
 }
 
-int tutorial_saxpy_speedup(size_t n)
+int tutorial_saxpy_speedup(size_t n, int N_TESTS)
 {
     // --- Open file and write CSV header if file is empty ---
-    FILE *out = fopen("scripts/data/saxpy_prof_O3_switched.csv", "a");
+    FILE *out = fopen("scripts/data/saxpy_prof_O3_avg.csv", "a");
     assert(out && "Unable to open output file");
 
     // Check if file is empty, then write header
@@ -304,24 +366,45 @@ int tutorial_saxpy_speedup(size_t n)
     // Measure time for vectorized SAXPY
     struct timespec start, end;
     uint64_t start_cycles, end_cycles;
+    double time_scalar = 0.0;
+    double time_vector = 0.0;
+    uint64_t cycles_scalar = 0;
+    uint64_t cycles_vector = 0;
 
     // Measure time for scalar SAXPY
-    clock_gettime(CLOCK_MONOTONIC, &start);
-    start_cycles = read_rdcycle();
-    saxpy_golden(n, a, x, y);
-    end_cycles = read_rdcycle();
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double time_scalar = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
-    uint64_t cycles_scalar = end_cycles - start_cycles;
+    for (int i = 0; i < N_TESTS; i++)
+    {
+        flush_cache_by_accessing_garbage();
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        start_cycles = read_rdcycle();
+        saxpy_golden(n, a, x, y);
+        end_cycles = read_rdcycle();
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        time_scalar += (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+        cycles_scalar += end_cycles - start_cycles;
+    }
 
-    clock_gettime(CLOCK_MONOTONIC, &start);
-    start_cycles = read_rdcycle();
-    saxpy_vec_tutorial_double(n, a, x, y_vectorized);
-    end_cycles = read_rdcycle();
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    double time_vectorized = (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
-    uint64_t cycles_vector = end_cycles - start_cycles;
-    printf("Vectorized SAXPY time: %.6f seconds\n", time_vectorized);
+    // take average on N_TESTS
+    const double cycles_scalar_mean = (double)cycles_scalar / N_TESTS;
+    const double time_scalar_mean = time_scalar / N_TESTS;
+
+    // Measure time for vectorized SAXPY
+    for (int i = 0; i < N_TESTS; i++)
+    {
+        flush_cache_by_accessing_garbage();
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        start_cycles = read_rdcycle();
+        saxpy_vec_tutorial_double(n, a, x, y_vectorized);
+        end_cycles = read_rdcycle();
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        time_vector += (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
+        cycles_vector += end_cycles - start_cycles;
+        printf("Vectorized SAXPY time: %.6f seconds\n", time_vector);
+    }
+
+    // take average on N_TESTS
+    const double cycles_vector_mean = (double)cycles_vector / N_TESTS;
+    const double time_vector_mean = time_vector / N_TESTS;
 
     // --- Check result ---
     int pass = 1;
@@ -334,22 +417,22 @@ int tutorial_saxpy_speedup(size_t n)
         }
     }
 
-    printf("Scalar SAXPY time: %.6f seconds\n", time_scalar);
-    double speedup = time_scalar / time_vectorized;
+    printf("Scalar SAXPY time: %.6f seconds\n", time_scalar_mean);
+    const double speedup = time_scalar_mean / time_vector_mean;
     printf("Speedup: %.2fx\n", speedup);
-    printf("Cycles scalar: %" PRIu64 "\n", cycles_scalar);
-    printf("Cycles vectorized: %" PRIu64 "\n", cycles_vector);
-    printf("Speedup (cycles): %.2fx\n", (double)(cycles_scalar) / (double)(cycles_vector));
+    printf("Cycles scalar: %.2f\n", cycles_scalar_mean);
+    printf("Cycles vectorized: %.2f\n", cycles_vector_mean);
+    printf("Speedup (cycles): %.2fx\n", cycles_scalar_mean / cycles_vector_mean);
     printf("%s\n\n", pass ? "PASS: Results match!" : "FAIL: Results do NOT match!");
 
     // save to CSV
-    fprintf(out, "%zu,%.6f,%.6f,%.2f,%" PRIu64 ",%" PRIu64 ",%.2f,%s\n",
+    fprintf(out, "%zu,%.6f,%.6f,%.2f,%.2f,%.2f,%.2f,%s\n",
             n,
-            time_scalar, time_vectorized,
+            time_scalar_mean, time_vector_mean,
             speedup,
-            cycles_scalar, // cycles scalar
-            cycles_vector, // cycles vectorized
-            (double)(cycles_scalar) / (double)(cycles_vector),
+            cycles_scalar_mean, // cycles scalar
+            cycles_vector_mean, // cycles vectorized
+            (double)(cycles_scalar_mean) / (double)(cycles_vector_mean),
             pass ? "PASS" : "FAIL");
 
     // Free allocated memory
@@ -361,30 +444,33 @@ int tutorial_saxpy_speedup(size_t n)
 
 int main(void)
 {
+    int N_TESTS = 10;
 /*
-     double sparsity_levels[] = {0.01, 0.02, 0.05, 0.1, 0.2};
-     int sizes[] = {1024, 2048, 4096, 8192, 16384, 32768};
+    // Random mv test
+    double sparsity_levels[] = {0.01, 0.02, 0.05, 0.1, 0.2};
+    int sizes[] = {1024, 2048, 4096, 8192, 16384, 32768};
 
-     for (int i = 0; i < sizeof(sparsity_levels) / sizeof(sparsity_levels[0]); ++i)
-     {
-         for (int j = 0; j < sizeof(sizes) / sizeof(sizes[0]); ++j)
-         {
-             mv_rvv_vs_scalar(sizes[j], sparsity_levels[i]);
-         }
-     }
+    for (int i = 0; i < sizeof(sparsity_levels) / sizeof(sparsity_levels[0]); ++i)
+    {
+        for (int j = 0; j < sizeof(sizes) / sizeof(sizes[0]); ++j)
+        {
+            mv_rvv_vs_scalar(sizes[j], sparsity_levels[i], N_TESTS);
+        }
+    }
 
-     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/2000.system");
-     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/8000.system");
-     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/32k.system");
-     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/128k.system");
+    // foam mv test
+    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/2000.system", N_TESTS);
+    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/8000.system", N_TESTS);
+    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/32k.system", N_TESTS);
+    test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/128k.system", N_TESTS);
 */
-
-//    tutorial_saxpy_speedup(1024 * 1024);     // 1 million elements
-    int sizes_saxpy[] = {1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576};  
+    // saxpy test
+    int sizes_saxpy[] = {1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576};
     printf("%lu \n", sizeof(sizes_saxpy));
-    for (int i = 0; i < sizeof(sizes_saxpy) / sizeof(sizes_saxpy[0]); i++){
-	tutorial_saxpy_speedup(sizes_saxpy[i]);
-	}    
+    for (int i = 0; i < sizeof(sizes_saxpy) / sizeof(sizes_saxpy[0]); i++)
+    {
+        tutorial_saxpy_speedup(sizes_saxpy[i], N_TESTS);
+    }
 
     return 0;
 }
