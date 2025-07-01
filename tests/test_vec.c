@@ -63,10 +63,15 @@ void test_mv_ell_vec_with_5x5_matrix()
         printf("  y[%d] = %g\n", i, y[i]);
     }
 
-    mv_ell_symmetric_full_colmajor_vector_debug(
+        mv_ell_symmetric_full_colmajor_vector_tail_opt(
         N_DIM, MAX_NNZ,
         diag, ell_values, ell_cols,
         x, y_vectorized);
+
+    // mv_ell_symmetric_full_colmajor_vector_debug(
+    //     N_DIM, MAX_NNZ,
+    //     diag, ell_values, ell_cols,
+    //     x, y_vectorized);
 
     printf("Result y (vectorized) = A * x:\n");
     for (int i = 0; i < N_DIM; ++i)
@@ -185,7 +190,8 @@ void test_mv_ell_vec_from_coo_matrix()
 
     // mv_ell_symmetric_full_colmajor_vector(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
     // mv_ell_symmetric_full_colmajor_vector_m2(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
-    mv_ell_symmetric_full_colmajor_vector_debug(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
+    // mv_ell_symmetric_full_colmajor_vector_debug(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
+    mv_ell_symmetric_full_colmajor_vector_tail_opt(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
     // mv_ell_symmetric_full_colmajor_vector_m8(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
     printf("Result y (vectorized) = A * x:\n");
     for (int i = 0; i < N_DIM; ++i)
@@ -281,10 +287,16 @@ void test_mv_ell_vec_from_random_coo_matrix(int n, double sparsity)
         n, max_nnz,
         diag, ell_values, ell_cols64,
         x, y);
-    mv_ell_symmetric_full_colmajor_vector(
+
+    mv_ell_symmetric_full_colmajor_vector_tail_opt(
         n, max_nnz,
         diag, ell_values, ell_cols64,
         x, y_vectorized);
+
+    // mv_ell_symmetric_full_colmajor_vector(
+    //     n, max_nnz,
+    //     diag, ell_values, ell_cols64,
+    //     x, y_vectorized);
 
     // 8) Print results side by side
     // puts(" y (serial)   |  y (vectorized)");
@@ -374,10 +386,16 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
         n, nnz_max,
         diag, ell_values, ell_cols64,
         x, y);
-    mv_ell_symmetric_full_colmajor_vector(
+
+    mv_ell_symmetric_full_colmajor_vector_tail_opt(
         n, nnz_max,
         diag, ell_values, ell_cols64,
         x, y_vectorized);
+
+    // mv_ell_symmetric_full_colmajor_vector(
+    //     n, nnz_max,
+    //     diag, ell_values, ell_cols64,
+    //     x, y_vectorized);
 
     // 8) Print results side by side
     puts(" y (serial)   |  y (vectorized)");
@@ -580,8 +598,12 @@ void test_mv_ell_vec_from_matrix_market(const char *filename)
     // 11) run mat-vec: serial and vectorized
     mv_ell_symmetric_full_colmajor_sdtint(
         N, max_nnz_row, diag, ell_values, ell_cols64, x, y);
-    mv_ell_symmetric_full_colmajor_vector(
+
+    mv_ell_symmetric_full_colmajor_vector_tail_opt(
         N, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
+    
+    // mv_ell_symmetric_full_colmajor_vector(
+    //     N, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
 
     // 12) print and compare
     puts(" y (serial)   |  y (vectorized)");

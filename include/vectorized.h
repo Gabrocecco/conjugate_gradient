@@ -4,6 +4,14 @@
 #include <math.h>
 #include <riscv_vector.h>
 
+void mv_ell_symmetric_full_colmajor_vector_tail_opt(int n,              // A matrix dimension (n x n)
+                                                    int max_nnz_row,    // max number of off-diagonal nnz in rows
+                                                    double *diag,       // dense diangonal
+                                                    double *ell_values, // ELL values all off-diagonal elements (size n * max_nnz_row)
+                                                    uint64_t *ell_cols, // ELL column indices (size n * max_nnz_row)
+                                                    double *x,          // input vector
+                                                    double *y);          // output vector
+
 void saxpy_vec_tutorial_double(size_t n, const double a, const double *x, double *y);
 
 void saxpy_vec_tutorial(size_t n, const float a, const float *x, float *y);

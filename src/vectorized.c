@@ -40,28 +40,32 @@ void vec_axpy_vectorized(double *a, double *b, double alpha, double *out, int n)
         vfloat64m1_t result = __riscv_vfmacc_vf_f64m1(va, alpha, vb, vl);
 
         __riscv_vse64_v_f64m1(&out[i], // destintion, where to write
-                              result,    // input, what to write
+                              result,  // input, what to write
                               vl);
     }
 }
 
 // Official vectorized version of SAXPY from tutorial
-void saxpy_vec_tutorial(size_t n, const float a, const float *x, float *y) {
-  for (size_t vl; n > 0; n -= vl, x += vl, y += vl) {
-    vl = __riscv_vsetvl_e32m8(n);
-    vfloat32m8_t vx = __riscv_vle32_v_f32m8(x, vl);
-    vfloat32m8_t vy = __riscv_vle32_v_f32m8(y, vl);
-    __riscv_vse32_v_f32m8(y, __riscv_vfmacc_vf_f32m8(vy, a, vx, vl), vl);
-  }
+void saxpy_vec_tutorial(size_t n, const float a, const float *x, float *y)
+{
+    for (size_t vl; n > 0; n -= vl, x += vl, y += vl)
+    {
+        vl = __riscv_vsetvl_e32m8(n);
+        vfloat32m8_t vx = __riscv_vle32_v_f32m8(x, vl);
+        vfloat32m8_t vy = __riscv_vle32_v_f32m8(y, vl);
+        __riscv_vse32_v_f32m8(y, __riscv_vfmacc_vf_f32m8(vy, a, vx, vl), vl);
+    }
 }
 
-void saxpy_vec_tutorial_double(size_t n, const double a, const double *x, double *y) {
-  for (size_t vl; n > 0; n -= vl, x += vl, y += vl) {
-    vl = __riscv_vsetvl_e64m1(n);
-    vfloat64m1_t vx = __riscv_vle64_v_f64m1(x, vl);
-    vfloat64m1_t vy = __riscv_vle64_v_f64m1(y, vl);
-    __riscv_vse64_v_f64m1(y, __riscv_vfmacc_vf_f64m1(vy, a, vx, vl), vl);
-  }
+void saxpy_vec_tutorial_double(size_t n, const double a, const double *x, double *y)
+{
+    for (size_t vl; n > 0; n -= vl, x += vl, y += vl)
+    {
+        vl = __riscv_vsetvl_e64m1(n);
+        vfloat64m1_t vx = __riscv_vle64_v_f64m1(x, vl);
+        vfloat64m1_t vy = __riscv_vle64_v_f64m1(y, vl);
+        __riscv_vse64_v_f64m1(y, __riscv_vfmacc_vf_f64m1(vy, a, vx, vl), vl);
+    }
 }
 
 void vec_axpy_vectorized_debug(double *a, double *b, double alpha, double *out, int n)
@@ -87,7 +91,7 @@ void vec_axpy_vectorized_debug(double *a, double *b, double alpha, double *out, 
         print_vfloat64_vector(result, vl, "result[]");
 
         __riscv_vse64_v_f64m1(&out[i], // destintion, where to write
-                              result,    // input, what to write
+                              result,  // input, what to write
                               vl);
     }
 }
@@ -179,9 +183,9 @@ void mv_ell_symmetric_full_colmajor_vector(int n,              // A matrix dimen
     // initialize y at zero
     memset(y, 0, n * sizeof(double));
 
-    // diagonal contributes 
+    // diagonal contributes
     size_t vl;
-    for (size_t i = 0; i < n; i += vl)  // iterate for all the diagonal elements, vl at the time 
+    for (size_t i = 0; i < n; i += vl) // iterate for all the diagonal elements, vl at the time
     {
         int remaining = n - i; // remaining elements to process
         // vl = max(vlmax, remaining);
@@ -207,7 +211,7 @@ void mv_ell_symmetric_full_colmajor_vector(int n,              // A matrix dimen
         __riscv_vse64_v_f64m1(&y[i], vy, vl); // y[i] = vy
     }
 
-    // off-diagonal contributes 
+    // off-diagonal contributes
     for (int slot = 0; slot < max_nnz_row; ++slot) // ierate slots (ELL columns) (there are max_nnz_row slots)
     {
         for (int j = 0; j < n; j += vl) // iterate elements in a slot (n elements for each slot)
@@ -268,6 +272,168 @@ void mv_ell_symmetric_full_colmajor_vector(int n,              // A matrix dimen
                                            vl);
 
             // 7. Write vy back to y
+            __riscv_vse64_v_f64m1(&y[j], // destintion, where to write
+                                  vy,    // input, what to write
+                                  vl);
+        }
+    }
+}
+
+void mv_ell_symmetric_full_colmajor_vector_tail_opt(int n,              // A matrix dimension (n x n)
+                                                    int max_nnz_row,    // max number of off-diagonal nnz in rows
+                                                    double *diag,       // dense diangonal
+                                                    double *ell_values, // ELL values all off-diagonal elements (size n * max_nnz_row)
+                                                    uint64_t *ell_cols, // ELL column indices (size n * max_nnz_row)
+                                                    double *x,          // input vector
+                                                    double *y)          // output vector
+{
+    // initialize y at zero
+    memset(y, 0, n * sizeof(double));
+
+    size_t vlmax = __riscv_vsetvlmax_e64m1(); // get maximum vector length for 64-bit doubles
+
+    size_t vl = __riscv_vsetvl_e64m1(vlmax); // set initial vector length to vlmax
+    size_t i = 0;
+
+    // diagonal contributes
+    // ! BODY
+    for (i = 0; i + (vlmax - 1) < n; i += vl) // iterate for all the diagonal elements, vl at the time
+    {
+        // load diag[i] and x[i] into vector registers
+        vfloat64m1_t vdiag = __riscv_vle64_v_f64m1(&diag[i], vl); // vdiag[i] = diag[i], vx[i] = x[i]
+        // load x[i] into vector register
+        vfloat64m1_t vx = __riscv_vle64_v_f64m1(&x[i], vl); // vx[i] = x[i]
+        // load y[i] into vector register
+        vfloat64m1_t vy = __riscv_vle64_v_f64m1(&y[i], vl); // should be zero, but safe, vy[i] = y[i]
+
+        // perform element-wise multiplication and accumulate
+        // y[i] += diag[i] * x[i]
+        // vfmacc.vv v[vy], v[vdiag], v[vx]
+        vy = __riscv_vfmacc_vv_f64m1(vy,    // destination and accumulate target
+                                     vdiag, // first input vector
+                                     vx,    // secondo input vector
+                                     vl);
+
+        // store result back to y[i]
+        // vse64.v v[vy], (&y[i])
+        __riscv_vse64_v_f64m1(&y[i], vy, vl); // y[i] = vy
+    }
+    // ! TAIL
+    int remaining = n - i;
+    if (remaining > 0) // if there are remaining elements to process
+    {
+        vl = __riscv_vsetvl_e64m1(remaining); // set vector length to the number of elements left to process (max vlmax)
+
+        // load diag[i] and x[i] into vector registers
+        vfloat64m1_t vdiag = __riscv_vle64_v_f64m1(&diag[i], vl); // vdiag[i] = diag[i], vx[i] = x[i]
+        // load x[i] into vector register
+        vfloat64m1_t vx = __riscv_vle64_v_f64m1(&x[i], vl); // vx[i] = x[i]
+        // load y[i] into vector register
+        vfloat64m1_t vy = __riscv_vle64_v_f64m1(&y[i], vl); // should be zero, but safe, vy[i] = y[i]
+
+        // perform element-wise multiplication and accumulate
+        // y[i] += diag[i] * x[i]
+        // vfmacc.vv v[vy], v[vdiag], v[vx]
+        vy = __riscv_vfmacc_vv_f64m1(vy,    // destination and accumulate target
+                                     vdiag, // first input vector
+                                     vx,    // secondo input vector
+                                     vl);
+
+        // store result back to y[i]
+        // vse64.v v[vy], (&y[i])
+        __riscv_vse64_v_f64m1(&y[i], vy, vl); // y[i] = vy
+    }
+
+    // off-diagonal contributes
+    for (int slot = 0; slot < max_nnz_row; ++slot) // ierate slots (ELL columns) (there are max_nnz_row slots)
+    {
+        vl = __riscv_vsetvl_e64m1(vlmax); // set initial vector length to vlmax
+        size_t j = 0;
+        // ! BODY
+        for (j = 0; j + (vlmax - 1) < n; j += vl) // iterate elements in a slot (n elements for each slot)
+        {
+            // compute offset for accessing ell_values[] and ell_cols[],
+            // each slot is n elements long and we are in the j-th element of this slot.
+            size_t base_offset = slot * n + j;
+
+            // 1. Load vl values from ell_values[] array starting from offset, no gather needed
+            vfloat64m1_t vvals = __riscv_vle64_v_f64m1(&ell_values[base_offset], vl);
+
+            // 2. Load vl column indices from ell_cols[] array starting from offset, no gather needed
+            vuint64m1_t vcol_idx = __riscv_vle64_v_u64m1(&ell_cols[base_offset], vl);
+
+            // scale by 8 indeces stored in vcol_idx, we need this because the gather wants the indeces in bytes positions
+            // each double is 8 bytes, so we scale indeces by 8
+            // from vcol_idx = [2, 4] -> scaled_idx = [128, 512]
+            vuint64m1_t scaled_idx = __riscv_vmul_vx_u64m1(vcol_idx, 8, vl);
+
+            // 3. Build mask for patting (col == -1), 1 if valid, 0 if padding
+            // vcol_idx = [5, -1] -> mask = [1, 0]
+            vbool64_t mask = __riscv_vmsne_vx_u64m1_b64(vcol_idx,     // input vector
+                                                        (uint64_t)-1, // where to mask
+                                                        vl);
+
+            /* 4. gather from x[col] with index vector vcol_idx
+             masked gather from x[col] with index vector vcol_idx, leave NaN's in unmasked positions
+                   x = [4,  2]
+            vcol_idx = [2, -1]    --------gather------> vx = [4, NaN]
+                mask = [1,  0]
+            */
+            vfloat64m1_t vx = __riscv_vluxei64_v_f64m1_m(mask,       // mask
+                                                         x,          // input vector
+                                                         scaled_idx, // indices
+                                                         vl);
+
+            // 5. Load vl contiguous elements of y, no gather needed
+            vfloat64m1_t vy = __riscv_vle64_v_f64m1(&y[j], vl);
+
+            // 6. vy += vvals * vx with masking, (masked FMA)
+            // in masked position we dont do anything, we leave old y[i] values
+            //       vx = [4,   2]
+            //    vvals = [7,   0]   --------FMA------> vy = [10 + 4*7, 20]
+            //       vy = [10, 20]                                       |
+            //                                                        (masked)
+            // vcol_idx = [2,  -1]
+            //     mask = [1,   0]
+            vy = __riscv_vfmacc_vv_f64m1_m(mask,  // mask
+                                           vy,    // output vector where to accumulate
+                                           vvals, // first input vector
+                                           vx,    // second input vector
+                                           vl);
+
+            // 7. Write vy back to y
+            __riscv_vse64_v_f64m1(&y[j], // destintion, where to write
+                                  vy,    // input, what to write
+                                  vl);
+        }
+        // ! TAIL
+        int remaining = n - j; // remaining elements to process
+        if (remaining > 0)     // if there are remaining elements to process
+        {
+            vl = __riscv_vsetvl_e64m1(remaining); // set vector length to the number of elements left to process (max vlmax)
+            size_t base_offset = slot * n + j;
+
+            vfloat64m1_t vvals = __riscv_vle64_v_f64m1(&ell_values[base_offset], vl);
+            vuint64m1_t vcol_idx = __riscv_vle64_v_u64m1(&ell_cols[base_offset], vl);
+
+            vuint64m1_t scaled_idx = __riscv_vmul_vx_u64m1(vcol_idx, 8, vl);
+            vbool64_t mask = __riscv_vmsne_vx_u64m1_b64(vcol_idx,     // input vector
+                                                        (uint64_t)-1, // where to mask
+                                                        vl);
+
+            vfloat64m1_t vx = __riscv_vluxei64_v_f64m1_m(mask,       // mask
+                                                         x,          // input vector
+                                                         scaled_idx, // indices
+                                                         vl);
+
+            vfloat64m1_t vy = __riscv_vle64_v_f64m1(&y[j], vl);
+
+            vy = __riscv_vfmacc_vv_f64m1_m(mask,  // mask
+                                           vy,    // output vector where to accumulate
+                                           vvals, // first input vector
+                                           vx,    // second input vector
+                                           vl);
+
             __riscv_vse64_v_f64m1(&y[j], // destintion, where to write
                                   vy,    // input, what to write
                                   vl);
