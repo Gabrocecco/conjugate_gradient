@@ -68,6 +68,31 @@ void saxpy_vec_tutorial_double(size_t n, const double a, const double *x, double
     }
 }
 
+void saxpy_vec_tutorial_double_vlset_opt(size_t n, const double a, const double *x, double *y)
+{
+    // set vl to vlmax
+    size_t vlmax = __riscv_vsetvlmax_e64m1();
+    // set vl to vlmax
+    size_t vl = __riscv_vsetvl_e64m1(n);
+    
+    for (vl; n > 0; n -= vl, x += vl, y += vl, n + (vlmax - 1) < n)
+    {
+        // vl = __riscv_vsetvl_e64m1(n);
+        vfloat64m1_t vx = __riscv_vle64_v_f64m1(x, vl);
+        vfloat64m1_t vy = __riscv_vle64_v_f64m1(y, vl);
+        __riscv_vse64_v_f64m1(y, __riscv_vfmacc_vf_f64m1(vy, a, vx, vl), vl);
+    }
+
+    // Handle the tail case
+    if (n > 0)
+    {
+        vl = __riscv_vsetvl_e64m1(n);
+        vfloat64m1_t vx = __riscv_vle64_v_f64m1(x, vl);
+        vfloat64m1_t vy = __riscv_vle64_v_f64m1(y, vl);
+        __riscv_vse64_v_f64m1(y, __riscv_vfmacc_vf_f64m1(vy, a, vx, vl), vl);
+    }
+}
+
 void vec_axpy_vectorized_debug(double *a, double *b, double alpha, double *out, int n)
 {
     size_t vl;
@@ -279,7 +304,7 @@ void mv_ell_symmetric_full_colmajor_vector(int n,              // A matrix dimen
     }
 }
 
-void mv_ell_symmetric_full_colmajor_vector_tail_opt(int n,              // A matrix dimension (n x n)
+void mv_ell_symmetric_full_colmajor_vector_vlset_opt(int n,              // A matrix dimension (n x n)
                                                     int max_nnz_row,    // max number of off-diagonal nnz in rows
                                                     double *diag,       // dense diangonal
                                                     double *ell_values, // ELL values all off-diagonal elements (size n * max_nnz_row)

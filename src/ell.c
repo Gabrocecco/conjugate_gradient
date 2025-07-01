@@ -663,12 +663,12 @@ double analyze_ell_matrix_full_colmajor(int n, int nnz_max,
     // --- Statistiche generali ---
     int total_slots = n * nnz_max;
     double padding_pct = 100.0 * padding_count / total_slots;
-    double utilization = 100.0 * (total_slots - padding_count) / total_slots;
+    // double utilization = 100.0 * (total_slots - padding_count) / total_slots;
 
     printf("\nTotal slots: %d\n", total_slots);
     printf("Padding count: %d\n", padding_count);
     printf("Padding percentage: %.2f%%\n", padding_pct);
-    printf("Memory utilization: %.2f%%\n", utilization);
+    // printf("Memory utilization: %.2f%%\n", utilization);
     if (mismatch_count == 0)
         printf("All zero values correctly marked with column index -1.\n");
     else
@@ -689,21 +689,20 @@ double analyze_ell_matrix_full_colmajor(int n, int nnz_max,
     }
 
     // --- Stampa distribuzione ---
-    printf("\nRow non-zero statistics:\n");
-    for (int k = nnz_max; k >= 0; --k)
-    {
-        if (row_nnz_counts[k] > 0)
-        {
-            double pct = 100.0 * row_nnz_counts[k] / n;
-            printf("Rows with exactly %d non-zeros: %d of %d (%.2f%%)\n",
-                   k, row_nnz_counts[k], n, pct);
-        }
-    }
+    // printf("\nRow non-zero statistics:\n");
+    // for (int k = nnz_max; k >= 0; --k)
+    // {
+    //     if (row_nnz_counts[k] > 0)
+    //     {
+    //         double pct = 100.0 * row_nnz_counts[k] / n;
+    //         printf("Rows with exactly %d non-zeros: %d of %d (%.2f%%)\n",
+    //                k, row_nnz_counts[k], n, pct);
+    //     }
+    // }
 
     free(row_nnz_counts);
 
-    // return sparsity number (example 0.01 means 1% of the matrix is non-zero)
-    printf("Sparsity %1.6f \n", (double)padding_count/total_slots);
+    // printf("Sparsity %1.6f \n", (double)padding_count/total_slots);
     return (double)padding_count/total_slots;
 }
 

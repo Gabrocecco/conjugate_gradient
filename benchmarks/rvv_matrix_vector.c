@@ -396,7 +396,8 @@ int tutorial_saxpy_speedup(size_t n, int N_TESTS)
         flush_cache_by_accessing_garbage();
         clock_gettime(CLOCK_MONOTONIC, &start);
         start_cycles = read_rdcycle();
-        saxpy_vec_tutorial_double(n, a, x, y_vectorized);
+        // saxpy_vec_tutorial_double(n, a, x, y_vectorized);
+        saxpy_vec_tutorial_double_vlset_opt(n, a, x, y_vectorized);
         end_cycles = read_rdcycle();
         clock_gettime(CLOCK_MONOTONIC, &end);
         time_vector += (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);

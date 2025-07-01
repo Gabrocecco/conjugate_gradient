@@ -63,7 +63,7 @@ void test_mv_ell_vec_with_5x5_matrix()
         printf("  y[%d] = %g\n", i, y[i]);
     }
 
-        mv_ell_symmetric_full_colmajor_vector_tail_opt(
+    mv_ell_symmetric_full_colmajor_vector_vlset_opt(
         N_DIM, MAX_NNZ,
         diag, ell_values, ell_cols,
         x, y_vectorized);
@@ -191,7 +191,7 @@ void test_mv_ell_vec_from_coo_matrix()
     // mv_ell_symmetric_full_colmajor_vector(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
     // mv_ell_symmetric_full_colmajor_vector_m2(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
     // mv_ell_symmetric_full_colmajor_vector_debug(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
-    mv_ell_symmetric_full_colmajor_vector_tail_opt(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
+    mv_ell_symmetric_full_colmajor_vector_vlset_opt(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
     // mv_ell_symmetric_full_colmajor_vector_m8(n, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
     printf("Result y (vectorized) = A * x:\n");
     for (int i = 0; i < N_DIM; ++i)
@@ -288,7 +288,7 @@ void test_mv_ell_vec_from_random_coo_matrix(int n, double sparsity)
         diag, ell_values, ell_cols64,
         x, y);
 
-    mv_ell_symmetric_full_colmajor_vector_tail_opt(
+    mv_ell_symmetric_full_colmajor_vector_vlset_opt(
         n, max_nnz,
         diag, ell_values, ell_cols64,
         x, y_vectorized);
@@ -387,7 +387,7 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename)
         diag, ell_values, ell_cols64,
         x, y);
 
-    mv_ell_symmetric_full_colmajor_vector_tail_opt(
+    mv_ell_symmetric_full_colmajor_vector_vlset_opt(
         n, nnz_max,
         diag, ell_values, ell_cols64,
         x, y_vectorized);
@@ -599,9 +599,9 @@ void test_mv_ell_vec_from_matrix_market(const char *filename)
     mv_ell_symmetric_full_colmajor_sdtint(
         N, max_nnz_row, diag, ell_values, ell_cols64, x, y);
 
-    mv_ell_symmetric_full_colmajor_vector_tail_opt(
+    mv_ell_symmetric_full_colmajor_vector_vlset_opt(
         N, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
-    
+
     // mv_ell_symmetric_full_colmajor_vector(
     //     N, max_nnz_row, diag, ell_values, ell_cols64, x, y_vectorized);
 
@@ -730,41 +730,54 @@ void test_vec_axpy_vector()
     // ---- Randomized test ----
     {
         const int n = 1024;
-        double *a = malloc(n * sizeof(*a));
-        double *b = malloc(n * sizeof(*b));
-        double *out_ref = malloc(n * sizeof(*out_ref));
-        double *out_vec = malloc(n * sizeof(*out_vec));
+        double *x = malloc(n * sizeof(double));
+        double *y = malloc(n * sizeof(double));
         double alpha = 0.37;
 
         // fill with random [0,1)
         for (int i = 0; i < n; ++i)
         {
-            a[i] = rand() / (double)RAND_MAX;
-            b[i] = rand() / (double)RAND_MAX;
+            x[i] = rand() / (double)RAND_MAX;
+            y[i] = rand() / (double)RAND_MAX;
         }
 
+        double *y_vectorized = malloc(n * sizeof(double));
+        memcpy(y_vectorized, y, n * sizeof(double));
+
         for (int i = 0; i < n; ++i)
-            out_ref[i] = a[i] + alpha * b[i];
-        vec_axpy_vectorized(a, b, alpha, out_vec, n);
+            y[i] = y[i] + alpha * x[i];
+
+        /* void saxpy_vec_tutorial_double(size_t n, const double a, const double *x, double *y)
+            {
+                for (size_t vl; n > 0; n -= vl, x += vl, y += vl)
+                {
+                    vl = __riscv_vsetvl_e64m1(n);
+                    vfloat64m1_t vx = __riscv_vle64_v_f64m1(x, vl);
+                    vfloat64m1_t vy = __riscv_vle64_v_f64m1(y, vl);
+                    __riscv_vse64_v_f64m1(y, __riscv_vfmacc_vf_f64m1(vy, a, vx, vl), vl);
+                }
+            }*/
+        // vec_axpy_vectorized(a, b, alpha, out_vec, n);
+        //saxpy_vec_tutorial_double(n, alpha, x, y_vectorized);
+        saxpy_vec_tutorial_double_vlset_opt(n, alpha, x, y_vectorized);
 
         int pass = 1;
         for (int i = 0; i < n; ++i)
         {
-            if (!fp_eq(out_ref[i], out_vec[i], 1e-9))
+            if (!fp_eq(y[i], y_vectorized[i], 1e-9))
             {
                 pass = 0;
                 printf("FAIL idx=%d: ref=%g vec=%g\n",
-                       i, out_ref[i], out_vec[i]);
+                       i, y[i], y_vectorized[i]);
                 break;
             }
         }
         printf("Random test (n=%d): %s\n\n", n,
                pass ? "PASS" : "FAIL");
 
-        free(a);
-        free(b);
-        free(out_ref);
-        free(out_vec);
+        free(x);
+        free(y);
+        free(y_vectorized);
     }
 }
 
