@@ -70,26 +70,26 @@ void saxpy_vec_tutorial_double(size_t n, const double a, const double *x, double
 
 void saxpy_vec_tutorial_double_vlset_opt(size_t n, const double a, const double *x, double *y)
 {
-    // set vl to vlmax
-    size_t vlmax = __riscv_vsetvlmax_e64m1();
-    // set vl to vlmax
-    size_t vl = __riscv_vsetvl_e64m1(n);
-    
-    for (vl; n > 0; n -= vl, x += vl, y += vl, n + (vlmax - 1) < n)
+    size_t vlmax = __riscv_vsetvl_e64m1(n);  // set once to the max VL supported for the type
+
+    size_t i = 0;
+    //! BODY
+    for (; i + (vlmax-1)< n; i += vlmax)
     {
-        // vl = __riscv_vsetvl_e64m1(n);
-        vfloat64m1_t vx = __riscv_vle64_v_f64m1(x, vl);
-        vfloat64m1_t vy = __riscv_vle64_v_f64m1(y, vl);
-        __riscv_vse64_v_f64m1(y, __riscv_vfmacc_vf_f64m1(vy, a, vx, vl), vl);
+        vfloat64m1_t vx = __riscv_vle64_v_f64m1(&x[i], vlmax);
+        vfloat64m1_t vy = __riscv_vle64_v_f64m1(&y[i], vlmax);
+        vfloat64m1_t vy_new = __riscv_vfmacc_vf_f64m1(vy, a, vx, vlmax);
+        __riscv_vse64_v_f64m1(&y[i], vy_new, vlmax);
     }
 
-    // Handle the tail case
-    if (n > 0)
+    //! TAIL
+    if (i<n)
     {
-        vl = __riscv_vsetvl_e64m1(n);
-        vfloat64m1_t vx = __riscv_vle64_v_f64m1(x, vl);
-        vfloat64m1_t vy = __riscv_vle64_v_f64m1(y, vl);
-        __riscv_vse64_v_f64m1(y, __riscv_vfmacc_vf_f64m1(vy, a, vx, vl), vl);
+        size_t vl = __riscv_vsetvl_e64m1(n-i);
+        vfloat64m1_t vx = __riscv_vle64_v_f64m1(&x[i], vl);
+        vfloat64m1_t vy = __riscv_vle64_v_f64m1(&y[i], vl);
+        vfloat64m1_t vy_new = __riscv_vfmacc_vf_f64m1(vy, a, vx, vl);
+        __riscv_vse64_v_f64m1(&y[i], vy_new, vl);
     }
 }
 
