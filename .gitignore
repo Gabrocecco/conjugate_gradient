@@ -1,2 +1,4 @@
 riscv/
 build/
+.vscode/
+
