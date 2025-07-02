@@ -6,55 +6,55 @@ set -euo pipefail
 # --------------------------------------------------------------
 proj_root="$(cd "$(dirname "$0")/../.." && pwd)"
 build_dir="$proj_root/build"
-src_dir="$proj_root/src"
 inc_dir="$proj_root/include"
+src_dir="$proj_root/src"
 data_dir="$proj_root/benchmarks/perf/data"
 
 mkdir -p "$build_dir" "$data_dir"
 
 # --------------------------------------------------------------
-# 2.  Compilazione di axpy_perf
+# 2.  Compilazione di mv_foam_perf
 # --------------------------------------------------------------
 gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
     -Wall -pedantic -I"$inc_dir" \
-    -o "$build_dir/axpy_perf" \
-    "$src_dir/vectorized.c" "$src_dir/common.c" axpy_perf.c
+    -o "$build_dir/mv_foam_perf" \
+    "$src_dir/vectorized.c" "$src_dir/parser.c" "$src_dir/common.c" "$src_dir/ell.c" mv_foam_perf.c
 
 # --------------------------------------------------------------
-# 3.  Taglie da testare
+# 3.  Dataset da testare (file OpenFOAM *.system)
 # --------------------------------------------------------------
-sizes=(1024 2048 4096 8192 16384 32768 65536 \
-       131072 262144 524288 1048576)
-
+dataset_dir="$proj_root/data/cylinder"
+sizes=(
+  "$dataset_dir/2000.system"
+  "$dataset_dir/8000.system"
+  "$dataset_dir/32k.system"
+  "$dataset_dir/128k.system"
+)
 # --------------------------------------------------------------
-# 4.  File CSV finale (viene sovrascritto ogni volta)
+# 4.  CSV finale (viene sovrascritto ogni volta)
 # --------------------------------------------------------------
-out="$data_dir/axpy_perf_full.csv"
-echo "n,time_serial,time_vectorized,speedup_time,"\
+out="$data_dir/mv_foam_perf_full.csv"
+echo "file,n,nnz_max,time_serial,time_vectorized,speedup_time,"\
 "cycles_serial,cycles_vector,speedup_cycles,pass,"\
 "L1-loads,L1-misses,LLC-loads,LLC-misses" > "$out"
 
 # --------------------------------------------------------------
-# 5.  Loop principale ― **una sola esecuzione** per taglia
+# 5.  Loop principale ― **una sola esecuzione** per file
 # --------------------------------------------------------------
-for n in "${sizes[@]}"; do
-    echo "Profiling n=$n …"
+for f in "${sizes[@]}"; do
+    echo "Profiling $f …"
 
-    # ── file temporanei ─────────────────────────────────────────
-    tmp_csv=$(mktemp)   # produrrà la riga CSV di axpy_perf
-    tmp_perf=$(mktemp)  # conterrà stderr di perf stat
+    tmp_csv=$(mktemp)
+    tmp_perf=$(mktemp)
 
-    # ── (a) UNICA esecuzione sotto perf stat ───────────────────
-    AXPY_CSV="$tmp_csv" \
+    MV_CSV="$tmp_csv" \
     perf stat -e L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses \
         -x, --output "$tmp_perf" \
-        -- "$build_dir/axpy_perf" "$n"
+        -- "$build_dir/mv_foam_perf" "$f"
 
-    # ── (b) estrai la riga CSV prodotta dal programma ──────────
-    prog_line=$(tail -n 1 "$tmp_csv")
+    line=$(tail -n 1 "$tmp_csv")
 
-    # ── (c) estrai i contatori da perf (awk su CSV di perf) ────
-    read l1_loads l1_miss llc_loads llc_miss <<< "$(
+    read l1 l1m llc llcm <<< "$(
         awk -F',' '
             $3=="L1-dcache-loads"       { gsub(/[^0-9]/,"",$1); l1=$1 }
             $3=="L1-dcache-load-misses" { gsub(/[^0-9]/,"",$1); l1m=$1 }
@@ -64,11 +64,10 @@ for n in "${sizes[@]}"; do
         ' "$tmp_perf"
     )"
 
-    # ── (d) scrivi la riga unificata sul file finale ───────────
-    echo "${prog_line},${l1_loads},${l1_miss},${llc_loads},${llc_miss}" >> "$out"
+    fname=$(basename "$f")            # ← solo il nome del file
+    echo "$fname,$line,$l1,$l1m,$llc,$llcm" >> "$out"
 
-    # ── (e) pulizia ────────────────────────────────────────────
     rm "$tmp_csv" "$tmp_perf"
 done
 
-echo "Profilazione completata — risultati in $out"
+echo "Done ➜ $out"
