@@ -116,7 +116,7 @@ void mv_rvv_vs_scalar(int n, double sparsity, int N_TESTS)
         clock_gettime(CLOCK_MONOTONIC, &start);
         start_cycles = read_rdcycle();
         // mv_ell_symmetric_full_colmajor_vector(n, max_nnz, diag, ell_values, ell_cols64, x, y_vectorized);
-        mv_ell_symmetric_full_colmajor_vector_tail_opt(n, max_nnz, diag, ell_values, ell_cols64, x, y_vectorized);
+        mv_ell_symmetric_full_colmajor_vector_vlset_opt(n, max_nnz, diag, ell_values, ell_cols64, x, y_vectorized);
         end_cycles = read_rdcycle();
         clock_gettime(CLOCK_MONOTONIC, &end);
         time_vector += (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
@@ -257,7 +257,7 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename, int N_TESTS)
         clock_gettime(CLOCK_MONOTONIC, &start);
         start_cycles = read_rdcycle();
         // mv_ell_symmetric_full_colmajor_vector(n, nnz_max, diag, ell_values, ell_cols64, x, y_vectorized);
-        mv_ell_symmetric_full_colmajor_vector_tail_opt(n, nnz_max, diag, ell_values, ell_cols64, x, y_vectorized);
+        mv_ell_symmetric_full_colmajor_vector_vlset_opt(n, nnz_max, diag, ell_values, ell_cols64, x, y_vectorized);
         end_cycles = read_rdcycle();
         clock_gettime(CLOCK_MONOTONIC, &end);
         time_vector += (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
@@ -337,7 +337,7 @@ void saxpy_golden(size_t n, double a, double *x, double *y)
 int tutorial_saxpy_speedup(size_t n, int N_TESTS)
 {
     // --- Open file and write CSV header if file is empty ---
-    FILE *out = fopen("scripts/data/saxpy_prof_O3_avg.csv", "a");
+    FILE *out = fopen("scripts/data/saxpy_prof_O3_avg_vlset_opt.csv", "a");
     assert(out && "Unable to open output file");
 
     // Check if file is empty, then write header
@@ -448,7 +448,7 @@ int tutorial_saxpy_speedup(size_t n, int N_TESTS)
 int main(void)
 {
     int N_TESTS = 30;
-
+/*
     // Random mv test
     double sparsity_levels[] = {0.01, 0.02, 0.05, 0.1, 0.2};
     int sizes[] = {1024, 2048, 4096, 8192, 16384, 32768};
@@ -466,14 +466,15 @@ int main(void)
     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/8000.system", N_TESTS);
     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/32k.system", N_TESTS);
     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/128k.system", N_TESTS);
+*/
 
     // saxpy test
-    // int sizes_saxpy[] = {1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576};
-    // printf("%lu \n", sizeof(sizes_saxpy));
-    // for (int i = 0; i < sizeof(sizes_saxpy) / sizeof(sizes_saxpy[0]); i++)
-    // {
-    //     tutorial_saxpy_speedup(sizes_saxpy[i], N_TESTS);
-    // }
+    int sizes_saxpy[] = {1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576};
+    printf("%lu \n", sizeof(sizes_saxpy));
+    for (int i = 0; i < sizeof(sizes_saxpy) / sizeof(sizes_saxpy[0]); i++)
+    {
+       tutorial_saxpy_speedup(sizes_saxpy[i], N_TESTS);
+     }
 
     return 0;
 }
