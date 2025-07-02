@@ -148,7 +148,7 @@ void mv_rvv_vs_scalar(int n, double sparsity, int N_TESTS)
     printf("%s\n\n", pass ? "PASS: Results match!" : "FAIL: Results do NOT match!");
 
     // --- Save to CSV ---
-    fprintf(out, "%d,%.4f,%d,%.6f,%.6f,%.2f,%" PRIu64 ",%" PRIu64 ",%.2f,%s\n",
+    fprintf(out, "%d,%.4f,%d,%.6f,%.6f,%.2f,%.2f,%.2f,%.2f,%s\n",
             n, sparsity, max_nnz,
             time_serial_mean, time_vector_mean,
             time_serial_mean / time_vector_mean,
@@ -282,13 +282,13 @@ int test_mv_ell_vec_from_openfoam_coo_matrix(char *filename, int N_TESTS)
     printf("Time serial     : %.6f s\n", time_serial_mean);
     printf("Time vectorized : %.6f s\n", time_vector_mean);
     printf("Speedup (time)  : %.2fx\n", time_serial_mean / time_vector_mean);
-    printf("Cycles serial   : %" PRIu64 "\n", cycles_serial_mean);
-    printf("Cycles vector   : %" PRIu64 "\n", cycles_vector_mean);
+    printf("Cycles serial   : %.2f \n", cycles_serial_mean);
+    printf("Cycles vector   : %.2f \n", cycles_vector_mean);
     printf("Speedup (cycles): %.2fx\n", cycles_serial_mean / cycles_vector_mean);
     printf("%s\n\n", pass ? "PASS: Results match!" : "FAIL: Results do NOT match!");
 
     // --- Save to CSV ---
-    fprintf(out, "%d,%.4f,%d,%.6f,%.6f,%.2f,%" PRIu64 ",%" PRIu64 ",%.2f,%s\n",
+    fprintf(out, "%d,%.4f,%d,%.6f,%.6f,%.2f,%.2f,%.2f,%.2f,%s\n",
             n, sparsity, nnz_max,
             time_serial_mean, time_vector_mean,
             time_serial_mean / time_vector_mean,
@@ -334,10 +334,10 @@ void saxpy_golden(size_t n, double a, double *x, double *y)
     }
 }
 
-int tutorial_saxpy_speedup(size_t n, int N_TESTS)
+void tutorial_saxpy_speedup(size_t n, int N_TESTS)
 {
     // --- Open file and write CSV header if file is empty ---
-    FILE *out = fopen("scripts/data/saxpy_prof_O3_avg_vlset_opt.csv", "a");
+    FILE *out = fopen("scripts/data/saxpy_prof_O3_avg_vlset_opt_perf.csv", "a");
     assert(out && "Unable to open output file");
 
     // Check if file is empty, then write header
@@ -347,7 +347,7 @@ int tutorial_saxpy_speedup(size_t n, int N_TESTS)
         fprintf(out, "n,time_serial,time_vectorized,speedup_time,cycles_serial,cycles_vector,speedup_cycles,pass\n");
     }
 
-    printf("Running SAXPY with random arrays of n size = %d\n", n);
+    printf("Running SAXPY with random arrays of n size = %ld\n", n);
 
     // generate random data
     // size_t n = 1024 * 1024; // 1 million elements
@@ -474,7 +474,7 @@ int main(void)
     for (int i = 0; i < sizeof(sizes_saxpy) / sizeof(sizes_saxpy[0]); i++)
     {
        tutorial_saxpy_speedup(sizes_saxpy[i], N_TESTS);
-     }
+    }
 
 
     return 0;

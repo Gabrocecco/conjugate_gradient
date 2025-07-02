@@ -168,7 +168,7 @@ double vec_dot_vectorized_debug(double *a,
     vfloat64m1_t vacc = __riscv_vfmv_v_f_f64m1(0.0, vl_max);
     print_vfloat64_vector(vacc, vl_max, "vacc[] (before main loop)");
 
-    size_t vl;
+    size_t vl = vl_max;
     // 3) loop (main loop + tail)
     for (size_t i = 0; i < (size_t)n; i += vl)
     {
