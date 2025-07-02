@@ -402,7 +402,6 @@ int tutorial_saxpy_speedup(size_t n, int N_TESTS)
         clock_gettime(CLOCK_MONOTONIC, &end);
         time_vector += (end.tv_sec - start.tv_sec) + 1e-9 * (end.tv_nsec - start.tv_nsec);
         cycles_vector += end_cycles - start_cycles;
-        printf("Vectorized SAXPY time: %.6f seconds\n", time_vector);
     }
 
     // take average on N_TESTS
@@ -468,6 +467,7 @@ int main(void)
     test_mv_ell_vec_from_openfoam_coo_matrix("data/cylinder/128k.system", N_TESTS);
 */
 
+
     // saxpy test
     int sizes_saxpy[] = {1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576};
     printf("%lu \n", sizeof(sizes_saxpy));
@@ -475,6 +475,7 @@ int main(void)
     {
        tutorial_saxpy_speedup(sizes_saxpy[i], N_TESTS);
      }
+
 
     return 0;
 }

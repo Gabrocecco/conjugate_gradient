@@ -189,6 +189,29 @@ benchmark_cg_scalar_vs_vector_native: $(BUILD_DIR)
 run_benchmark_cg_scalar_vs_vector_native: benchmark_cg_scalar_vs_vector_native
 	./$(BUILD_DIR)/benchmark_cg_scalar_vs_vector_native
 
+# Peak FLOPS benchmark
+benchmark_peak_flops: $(BUILD_DIR)
+	$(RISCV_NATIVE_MILKV_PIONEER_CC) $(RISCV_NATIVE_MILKV_PIONEER_FLAGS) $(CFLAGS) \
+		-o $(BUILD_DIR)/$@ \
+		benchmarks/roofline/flops_peak.c
+
+# STREAM benchmark
+benchmark_stream: $(BUILD_DIR)
+	gcc -O3 -DSTREAM_ARRAY_SIZE=100000000 -DNTIMES=30 benchmarks/roofline/stream.c  -o build/stream 
+
+
+
+# Milk-V matmul example 
+test_rvv_matmul: $(BUILD_DIR)
+	$(RISCV_NATIVE_MILKV_PIONEER_CC) $(RISCV_NATIVE_MILKV_PIONEER_FLAGS) $(CFLAGS) \
+		-o $(BUILD_DIR)/$@ \
+		benchmarks/rvv_tutorials/rvv_matmul.c \
+		src/common.c
+
+run_test_rvv_matmul: test_rvv_matmul
+	./$(BUILD_DIR)/test_rvv_matmul
+
+
 # === Build directory ===
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
