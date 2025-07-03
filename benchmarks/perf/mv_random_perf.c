@@ -1,14 +1,12 @@
 /*  ───────────────────────────────────────────────────────────────────────────
-    random_mv_perf_noflush.c
-    Bench: symmetric sparse ELL × vector, scalar vs. RVV-optimized (VLSET)
-    (versione senza flush_cache)
-
-    Build (esempio):
+    random_mv_perf.c   –  RV64  (no flush, ciclo 64-bit)
+    Bench: symmetric sparse ELL × vector, scalar vs. RVV-VLSET
+    Build:
       gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
           -Wall -pedantic -I../../include \
           -o ../../build/random_mv_perf \
           ../../src/vectorized.c ../../src/common.c ../../src/random.c \
-          ../../src/ell.c random_mv_perf_noflush.c
+          ../../src/ell.c random_mv_perf.c
     ─────────────────────────────────────────────────────────────────────────── */
 
 #define _POSIX_C_SOURCE 200112L
@@ -28,20 +26,22 @@
 #include "csr.h"
 
 /* ───────────────────────── Parametri ───────────────────────── */
-#define N_TESTS 20   /* ripetizioni per la media */
+#define N_TESTS 20        /* ripetizioni mediate */
 
 /* ───────────────────────── Utility inline ───────────────────── */
 static inline double ts_to_sec(struct timespec t)
 { return t.tv_sec + 1e-9 * t.tv_nsec; }
 
-static inline uint64_t rdcycle(void)
-{ uint64_t c; __asm__ volatile("rdcycle %0" : "=r"(c)); return c; }
-
-static inline uint64_t diff64(uint64_t s, uint64_t e)
-{ return e >= s ? e - s : UINT64_MAX - s + 1 + e; }
+/* Lettura 64-bit del contatore cicli (RV64) */
+static inline uint64_t rdcycle64(void)
+{
+    uint64_t c;
+    __asm__ volatile ("rdcycle %0" : "=r"(c));
+    return c;
+}
 
 /* ───────────────────────── Core benchmark ───────────────────── */
-static void mv_rvv_vs_scalar(int n, double sparsity, int n_tests)
+static void mv_rvv_vs_scalar(int n, double sparsity)
 {
     /* CSV ------------------------------------------------------------------ */
     const char *csv_path = getenv("MV_RND_CSV");
@@ -81,42 +81,45 @@ static void mv_rvv_vs_scalar(int n, double sparsity, int n_tests)
 
     /* Accumulatori --------------------------------------------------------- */
     struct timespec t0, t1;
-    uint64_t c0, c1;
     double   t_s_sum = 0., t_v_sum = 0.;
     uint64_t c_s_sum = 0,  c_v_sum = 0;
 
     /* ---------- Scalar loop ---------- */
-    for (int it = 0; it < n_tests; ++it) {
+    for (int it = 0; it < N_TESTS; ++it) {
         memset(y_s, 0, n * sizeof(*y_s));
 
-        clock_gettime(CLOCK_MONOTONIC_RAW, &t0); c0 = rdcycle();
+        clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
+        uint64_t c0 = rdcycle64();
         mv_ell_symmetric_full_colmajor_sdtint(
             n, max_nnz, diag, ell_val, ell_col64, x, y_s);
-        c1 = rdcycle(); clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+        uint64_t c1 = rdcycle64();
+        clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
 
         t_s_sum += ts_to_sec((struct timespec){
                         t1.tv_sec - t0.tv_sec, t1.tv_nsec - t0.tv_nsec});
-        c_s_sum += diff64(c0, c1);
+        c_s_sum += c1 - c0;
     }
 
     /* ---------- Vector loop ---------- */
-    for (int it = 0; it < n_tests; ++it) {
+    for (int it = 0; it < N_TESTS; ++it) {
         memset(y_v, 0, n * sizeof(*y_v));
 
-        clock_gettime(CLOCK_MONOTONIC_RAW, &t0); c0 = rdcycle();
+        clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
+        uint64_t c0 = rdcycle64();
         mv_ell_symmetric_full_colmajor_vector_vlset_opt(
             n, max_nnz, diag, ell_val, ell_col64, x, y_v);
-        c1 = rdcycle(); clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+        uint64_t c1 = rdcycle64();
+        clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
 
         t_v_sum += ts_to_sec((struct timespec){
                         t1.tv_sec - t0.tv_sec, t1.tv_nsec - t0.tv_nsec});
-        c_v_sum += diff64(c0, c1);
+        c_v_sum += c1 - c0;
     }
 
-    double t_s = t_s_sum / n_tests;
-    double t_v = t_v_sum / n_tests;
-    double c_s = (double)c_s_sum / n_tests;
-    double c_v = (double)c_v_sum / n_tests;
+    double t_s = t_s_sum / N_TESTS;
+    double t_v = t_v_sum / N_TESTS;
+    double c_s = (double)c_s_sum / N_TESTS;
+    double c_v = (double)c_v_sum / N_TESTS;
 
     /* Correctness ---------------------------------------------------------- */
     int pass = 1;
@@ -149,6 +152,6 @@ int main(int argc, char **argv)
     double sparsity = atof(argv[2]);
 
     srand(42);
-    mv_rvv_vs_scalar(n, sparsity, N_TESTS);
+    mv_rvv_vs_scalar(n, sparsity);
     return 0;
 }
