@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # --------------------------------------------------------------
-# 1.  Percorsi
+# 1.  Folders
 # --------------------------------------------------------------
 proj_root="$(cd "$(dirname "$0")/../.." && pwd)"
 build_dir="$proj_root/build"
@@ -13,7 +13,7 @@ data_dir="$proj_root/benchmarks/perf/data"
 mkdir -p "$build_dir" "$data_dir"
 
 # --------------------------------------------------------------
-# 2.  Compilazione di axpy_perf
+# 2.  Compilation of axpy_perf
 # --------------------------------------------------------------
 gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
     -Wall -pedantic -I"$inc_dir" \
@@ -21,13 +21,13 @@ gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
     "$src_dir/vectorized.c" "$src_dir/common.c" axpy_perf.c
 
 # --------------------------------------------------------------
-# 3.  Taglie da testare
+# 3.  Sizes to test
 # --------------------------------------------------------------
 sizes=(1024 2048 4096 8192 16384 32768 65536 \
        131072 262144 524288 1048576)
 
 # --------------------------------------------------------------
-# 4.  File CSV finale (viene sovrascritto ogni volta)
+# 4.  Final CSV file (overwritten every time)
 # --------------------------------------------------------------
 out="$data_dir/axpy_perf_full.csv"
 echo "n,time_serial,time_vectorized,speedup_time,"\
@@ -35,25 +35,25 @@ echo "n,time_serial,time_vectorized,speedup_time,"\
 "L1-loads,L1-misses,LLC-loads,LLC-misses" > "$out"
 
 # --------------------------------------------------------------
-# 5.  Loop principale ― **una sola esecuzione** per taglia
+# 5.  Main loop 
 # --------------------------------------------------------------
 for n in "${sizes[@]}"; do
     echo "Profiling n=$n …"
 
-    # ── file temporanei ─────────────────────────────────────────
-    tmp_csv=$(mktemp)   # produrrà la riga CSV di axpy_perf
-    tmp_perf=$(mktemp)  # conterrà stderr di perf stat
+    # ── temp files ─────────────────────────────────────────
+    tmp_csv=$(mktemp)   # will contain the CSV line from axpy_perf
+    tmp_perf=$(mktemp)  # will contain data from perf stat
 
-    # ── (a) UNICA esecuzione sotto perf stat ───────────────────
+    # run the program under perf stat
     AXPY_CSV="$tmp_csv" \
     perf stat -e L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses \
         -x, --output "$tmp_perf" \
         -- "$build_dir/axpy_perf" "$n"
 
-    # ── (b) estrai la riga CSV prodotta dal programma ──────────
+    # extract the last line from the temporary CSV file
     prog_line=$(tail -n 1 "$tmp_csv")
 
-    # ── (c) estrai i contatori da perf (awk su CSV di perf) ────
+    # read the performance counters from the perf output using awk
     read l1_loads l1_miss llc_loads llc_miss <<< "$(
         awk -F',' '
             $3=="L1-dcache-loads"       { gsub(/[^0-9]/,"",$1); l1=$1 }
@@ -64,11 +64,11 @@ for n in "${sizes[@]}"; do
         ' "$tmp_perf"
     )"
 
-    # ── (d) scrivi la riga unificata sul file finale ───────────
+    # write the results to the final CSV file
     echo "${prog_line},${l1_loads},${l1_miss},${llc_loads},${llc_miss}" >> "$out"
 
-    # ── (e) pulizia ────────────────────────────────────────────
+    # clean up temporary files
     rm "$tmp_csv" "$tmp_perf"
 done
 
-echo "Profilazione completata — risultati in $out"
+echo "Results in $out"

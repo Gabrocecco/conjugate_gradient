@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ──────────────────────────────────────────────────────
-# 1.  Percorsi
+# 1.  Folders
 # ──────────────────────────────────────────────────────
 proj_root="$(cd "$(dirname "$0")/../.." && pwd)"
 build_dir="$proj_root/build"
@@ -13,7 +13,7 @@ data_dir="$proj_root/benchmarks/perf/data"
 mkdir -p "$build_dir" "$data_dir"
 
 # ──────────────────────────────────────────────────────
-# 2.  Compilazione (output = random_mv_perf)
+# 2.  Compilations (output = random_mv_perf)
 # ──────────────────────────────────────────────────────
 gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
     -Wall -pedantic -I"$inc_dir" \
@@ -23,16 +23,16 @@ gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
     "$src_dir/coo.c" \
     "$src_dir/ell.c" \
     "$src_dir/csr.c" \
-    mv_random_perf.c            # <-- il tuo .c completo
+    mv_random_perf.c            
 
 # ──────────────────────────────────────────────────────
-# 3.  Parametri da testare
+# 3.  Sizes and sparsities to test
 # ──────────────────────────────────────────────────────
 sizes=(1024 2048 4096 8192 16384 32768)
 sparsities=(0.01 0.02 0.05 0.10 0.20)
 
 # ──────────────────────────────────────────────────────
-# 4.  CSV finale
+# 4.  Final CSV file (overwritten every time)
 # ──────────────────────────────────────────────────────
 out="$data_dir/mv_random_perf_full.csv"
 echo "n,sparsity,max_nnz_row,time_serial,time_vectorized,speedup_time,"\
@@ -40,7 +40,7 @@ echo "n,sparsity,max_nnz_row,time_serial,time_vectorized,speedup_time,"\
 "L1-loads,L1-misses,LLC-loads,LLC-misses" > "$out"
 
 # ──────────────────────────────────────────────────────
-# 5.  Loop principale
+# 5.  Main loop 
 # ──────────────────────────────────────────────────────
 for spars in "${sparsities[@]}"; do
   for n in "${sizes[@]}"; do
@@ -55,8 +55,10 @@ for spars in "${sparsities[@]}"; do
         -x, --output "$tmp_perf" \
         -- "$build_dir/random_mv_perf" "$n" "$spars"
 
+    # extract the last line from the temporary CSV file
     prog_line=$(tail -n 1 "$tmp_csv")
 
+    # extract the performance counters from the perf output using awk
     read l1 l1m llc llcm <<< "$(
       awk -F',' '
         $3=="L1-dcache-loads"       { gsub(/[^0-9]/,"",$1); l1=$1 }
@@ -67,9 +69,11 @@ for spars in "${sparsities[@]}"; do
       ' "$tmp_perf"
     )"
 
+    # extract the maximum number of non-zero elements per row
     echo "$prog_line,$l1,$l1m,$llc,$llcm" >> "$out"
+    # — clean up —
     rm "$tmp_csv" "$tmp_perf"
   done
 done
 
-echo "Done ➜ $out"
+echo "Done -> $out"

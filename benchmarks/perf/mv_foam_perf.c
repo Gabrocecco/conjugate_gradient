@@ -1,13 +1,14 @@
-// mv_foam_perf.c  – double‑precision, symmetric ELL × vector
-// Build:
-//   gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
-//       -Wall -pedantic -I../../include \
-//       -o /conjugate_gradient_laptop/build/mv_foam_perf \
-//       ../../src/vectorized.c ../../src/common.c mv_foam_perf.c
-//
-// Usage:
-//   ./mv_foam_perf <openfoam_system_file>   # averaged over N_TESTS runs
-//
+/* mv_foam_perf.c  – symmetric ELL x vector
+   Build:
+     gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
+         -Wall -pedantic -I../../include \
+         -o /conjugate_gradient_laptop/build/mv_foam_perf \
+         ../../src/vectorized.c ../../src/common.c mv_foam_perf.c
+  
+   Usage:
+     ./mv_foam_perf <openfoam_system_file>   # averaged over N_TESTS runs
+*/
+
 // Configuration
 #ifndef N_TESTS
 #define N_TESTS 100
@@ -22,13 +23,16 @@
 #include <time.h>
 #include <inttypes.h>
 #include <assert.h>
+
 #include "ell.h"
 #include "common.h"
 #include "vectorized.h" // mv_ell_symmetric_full_colmajor_vector_vlset_opt()
-#include "parser.h"   // parseDoubleArray / parseIntArray helpers
+#include "parser.h"   // parseDoubleArray / parseIntArray 
 
 static inline double ts_to_sec(struct timespec t) { return t.tv_sec + 1e-9 * t.tv_nsec; }
-static inline uint64_t rdcycle()
+
+/* Read 64 bit (RV64) cycle counter */
+static inline uint64_t rdcycle64(void)
 {
     uint64_t c;
     __asm__ volatile("rdcycle %0" : "=r"(c));
@@ -51,26 +55,28 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+    // read OpenFOAM matrix data
     int n = 0, n_upper = 0, n_lower = 0;
     double *diag = parseDoubleArray(file, "diag", &n);
-    double *upper = parseDoubleArray(file, "upper", &n_upper);
-    int *colU = parseIntArray(file, "upperAddr", &n_upper);
-    int *rowL = parseIntArray(file, "lowerAddr", &n_lower);
+    double *upper = parseDoubleArray(file, "upper", &n_upper);  
+    int *coo_cols = parseIntArray(file, "upperAddr", &n_upper);
+    int *coo_rows = parseIntArray(file, "lowerAddr", &n_lower);
     fclose(file);
 
-    int nnz_max = compute_max_nnz_row_full(n, n_upper, rowL, colU);
-    double *sparsity_ratio = NULL; // computed later
+    // compute the max number of non-zero elements in each row (not counting diagonal elements)
+    int nnz_max = compute_max_nnz_row_full(n, n_upper, coo_rows, coo_cols);
 
-    // allocate ELL
+    // convert COO to ELL format
     double *ell_val = aligned_alloc(64, (size_t)nnz_max * n * sizeof(double));
     int *ell_col = aligned_alloc(64, (size_t)nnz_max * n * sizeof(int));
-    coo_to_ell_symmetric_full_colmajor(n, n_upper, upper, rowL, colU, ell_val, ell_col, nnz_max);
-    sparsity_ratio = NULL; // if you need ratio use analyze_ell_matrix_full_colmajor()
+    coo_to_ell_symmetric_full_colmajor(n, n_upper, upper, coo_rows, coo_cols, ell_val, ell_col, nnz_max);
 
+    // convert ELL column indices to 64-bit integers for vectorized operations
     uint64_t *ell_col64 = aligned_alloc(64, (size_t)nnz_max * n * sizeof(uint64_t));
     for (size_t k = 0; k < (size_t)nnz_max * n; k++)
         ell_col64[k] = (uint64_t)ell_col[k];
 
+    // allocate input and output vectors
     double *x = aligned_alloc(64, n * sizeof(double));
     double *y_ref = calloc(n, sizeof(double));
     double *y_vec = calloc(n, sizeof(double));
@@ -96,6 +102,7 @@ int main(int argc, char **argv)
         uint64_t ce = rdcycle();
         t_s_sum += ts_to_sec((struct timespec){t1.tv_sec - t0.tv_sec, t1.tv_nsec - t0.tv_nsec});
         c_s_sum += diff64(cs, ce);
+        // c_s_sum += ce - cs;
 
         memset(y_vec, 0, n * sizeof(double));
         cs = rdcycle();
@@ -106,8 +113,10 @@ int main(int argc, char **argv)
         t_v_sum += ts_to_sec((struct timespec){t1.tv_sec - t0.tv_sec, t1.tv_nsec - t0.tv_nsec});
         c_v_sum += diff64(cs, ce);
     }
+
     double t_s = t_s_sum / N_TESTS, t_v = t_v_sum / N_TESTS;
     uint64_t c_s = c_s_sum / N_TESTS, c_v = c_v_sum / N_TESTS;
+    
     int pass = 1;
     for (int i = 0; i < n; i++)
         if (fabs(y_ref[i] - y_vec[i]) > 1e-6)
@@ -132,15 +141,17 @@ int main(int argc, char **argv)
         fprintf(out, "%d,%d,%.6f,%.6f,%.2f,%.2f,%.2f,%.2f,%s\n", n, nnz_max, t_s, t_v, t_s / t_v, (double)c_s, (double)c_v, (double)c_s / (double)c_v, pass ? "PASS" : "FAIL");
         fclose(out);
     }
+
     free(x);
     free(y_ref);
     free(y_vec);
     free(diag);
     free(upper);
-    free(colU);
-    free(rowL);
+    free(coo_cols);
+    free(coo_rows);
     free(ell_val);
     free(ell_col);
     free(ell_col64);
+
     return pass ? EXIT_SUCCESS : EXIT_FAILURE;
 }

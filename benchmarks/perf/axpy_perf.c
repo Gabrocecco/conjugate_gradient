@@ -1,15 +1,17 @@
-// axpy_perf.c  – double-precision version
-// Build:
-//   gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
-//       -Wall -pedantic -I../../include \
-//       -o /conjugate_gradient_laptop/build/axpy_perf \
-//       ../../src/vectorized.c ../../src/common.c axpy_perf.c
-//
-// Usage:
-//   ./axpy_perf <num_elements>
-//   (The program runs the scalar and vector kernels N_TESTS times and prints / appends the average.)
-//
-// Configuration: N_TESTS controls the number of timed repetitions.
+/* axpy_perf.c  – double-precision version
+   Build:
+     gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
+         -Wall -pedantic -I../../include \
+         -o /conjugate_gradient_laptop/build/axpy_perf \
+         ../../src/vectorized.c ../../src/common.c axpy_perf.c
+  
+   Usage:
+     ./axpy_perf <num_elements>
+     (The program runs the scalar and vector kernels N_TESTS times and prints / appends the average.)
+  
+   Configuration: N_TESTS controls the number of timed repetitions.
+*/
+
 // -----------------------------------------------------------------------------
 #define _POSIX_C_SOURCE 200112L
 #include <stdio.h>
@@ -21,8 +23,7 @@
 #include <time.h>
 #include <inttypes.h>
 #include <riscv_vector.h>
-
-#include "common.h"      // may contain read_rdcycle()
+#include "common.h"
 #include "vectorized.h"  // saxpy_vec_tutorial_double_vlset_opt()
 
 #ifndef N_TESTS
@@ -32,24 +33,26 @@
 // -----------------------------------------------------------------------------
 // aligned_alloc fallback for toolchains without C11 aligned_alloc()
 // -----------------------------------------------------------------------------
-#if (__STDC_VERSION__ < 201112L) || (defined(__APPLE__) && !defined(aligned_alloc))
-static void *aligned_malloc(size_t alignment, size_t size)
-{
-    void *ptr = NULL;
-    if (posix_memalign(&ptr, alignment, size) != 0) ptr = NULL;
-    return ptr;
-}
-#define aligned_alloc(alignment, size) aligned_malloc(alignment, size)
-#endif
+// #if (__STDC_VERSION__ < 201112L) || (defined(__APPLE__) && !defined(aligned_alloc))
+// static void *aligned_malloc(size_t alignment, size_t size)
+// {
+//     void *ptr = NULL;
+//     if (posix_memalign(&ptr, alignment, size) != 0) ptr = NULL;
+//     return ptr;
+// }
+// #define aligned_alloc(alignment, size) aligned_malloc(alignment, size)
+// #endif
 
-#ifndef HAVE_READ_RDCYCLE
+static inline double timespec_to_sec(struct timespec t){return t.tv_sec + t.tv_nsec * 1e-9;}
+
 static inline uint64_t read_rdcycle(void)
 {
     uint64_t cycle;
     __asm__ volatile("rdcycle %0" : "=r"(cycle));
     return cycle;
 }
-#endif
+
+static inline uint64_t diff64(uint64_t s, uint64_t e) { return e >= s ? e - s : UINT64_MAX - s + 1 + e; }
 
 // -----------------------------------------------------------------------------
 // Scalar double-precision AXPY: y = a * x + y
@@ -58,11 +61,6 @@ static void saxpy_scalar(size_t n, double a, const double *x, double *y)
 {
     for (size_t i = 0; i < n; ++i)
         y[i] = a * x[i] + y[i];
-}
-
-static inline double timespec_to_sec(struct timespec t)
-{
-    return t.tv_sec + t.tv_nsec * 1e-9;
 }
 
 int main(int argc, char **argv)
@@ -83,10 +81,16 @@ int main(int argc, char **argv)
     // ---------------------------------------------------------------------
     // Allocate buffers
     // ---------------------------------------------------------------------
-    double *x       = aligned_alloc(64, n * sizeof(double));
-    double *y_init  = aligned_alloc(64, n * sizeof(double));
-    double *y_ref   = aligned_alloc(64, n * sizeof(double));
-    double *y_vec   = aligned_alloc(64, n * sizeof(double));
+    // double *x       = aligned_alloc(64, n * sizeof(double));
+    // double *y_init  = aligned_alloc(64, n * sizeof(double));
+    // double *y_ref   = aligned_alloc(64, n * sizeof(double));
+    // double *y_vec   = aligned_alloc(64, n * sizeof(double));
+
+    double *x = malloc(n * sizeof(double));
+    double *y_init = malloc(n * sizeof(double));
+    double *y_ref = malloc(n * sizeof(double));
+    double *y_vec = malloc(n * sizeof(double));
+
     assert(x && y_init && y_ref && y_vec);
 
     srand(42);
@@ -123,7 +127,8 @@ int main(int argc, char **argv)
 
         t_scalar_sum += timespec_to_sec((struct timespec){ts1.tv_sec - ts0.tv_sec,
                                                          ts1.tv_nsec - ts0.tv_nsec});
-        c_scalar_sum += end_cycles - start_cycles;
+        // c_scalar_sum += end_cycles - start_cycles;
+        c_scalar_sum += diff64(start_cycles, end_cycles);
 
         // Vector
         memcpy(y_vec, y_init, n * sizeof(double));
@@ -135,7 +140,8 @@ int main(int argc, char **argv)
 
         t_vector_sum += timespec_to_sec((struct timespec){ts1.tv_sec - ts0.tv_sec,
                                                          ts1.tv_nsec - ts0.tv_nsec});
-        c_vector_sum += end_cycles - start_cycles;
+        // c_vector_sum += end_cycles - start_cycles;
+        c_vector_sum += diff64(start_cycles, end_cycles);
     }
 
     const double   t_scalar_avg = t_scalar_sum / N_TESTS;
