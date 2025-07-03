@@ -95,21 +95,21 @@ int main(int argc, char **argv)
     for (int it = 0; it < N_TESTS; ++it)
     {
         memset(y_ref, 0, n * sizeof(double));
-        uint64_t cs = rdcycle();
+        uint64_t cs = rdcycle64();
         clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
         mv_ell_symmetric_full_colmajor_sdtint(n, nnz_max, diag, ell_val, ell_col64, x, y_ref);
         clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
-        uint64_t ce = rdcycle();
+        uint64_t ce = rdcycle64();
         t_s_sum += ts_to_sec((struct timespec){t1.tv_sec - t0.tv_sec, t1.tv_nsec - t0.tv_nsec});
         c_s_sum += diff64(cs, ce);
         // c_s_sum += ce - cs;
 
         memset(y_vec, 0, n * sizeof(double));
-        cs = rdcycle();
+        cs = rdcycle64();
         clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
         mv_ell_symmetric_full_colmajor_vector_vlset_opt(n, nnz_max, diag, ell_val, ell_col64, x, y_vec);
         clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
-        ce = rdcycle();
+        ce = rdcycle64();
         t_v_sum += ts_to_sec((struct timespec){t1.tv_sec - t0.tv_sec, t1.tv_nsec - t0.tv_nsec});
         c_v_sum += diff64(cs, ce);
     }
