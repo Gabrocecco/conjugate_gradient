@@ -1,76 +1,111 @@
 #!/usr/bin/env bash
+# run_foam_perf.sh – build scalar / vector, tre pass di perf stat
+#                    (L1, LLC, L2) e CSV con contatori grezzi.
 set -euo pipefail
 
-# --------------------------------------------------------------
-# 1.  Folders 
-# --------------------------------------------------------------
+# ───────────────────────── paths ─────────────────────────
 proj_root="$(cd "$(dirname "$0")/../.." && pwd)"
 build_dir="$proj_root/build"
-inc_dir="$proj_root/include"
 src_dir="$proj_root/src"
+inc_dir="$proj_root/include"
 data_dir="$proj_root/benchmarks/perf/data"
-
 mkdir -p "$build_dir" "$data_dir"
 
-# --------------------------------------------------------------
-# 2.  COmpilation of mv_foam_perf
-# --------------------------------------------------------------
-gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
-    -Wall -pedantic -I"$inc_dir" \
-    -o "$build_dir/mv_foam_perf" \
-    "$src_dir/vectorized.c" "$src_dir/parser.c" "$src_dir/common.c" "$src_dir/ell.c" mv_foam_perf.c
+# ────────────────────── build binaries ───────────────────
+common_sources=(
+  "$src_dir/vectorized.c" "$src_dir/parser.c" "$src_dir/common.c"
+  "$src_dir/ell.c"        "$proj_root/benchmarks/perf/mv_foam_perf.c"
+)
 
-# --------------------------------------------------------------
-# 3.  Foam matrices to test on (file OpenFOAM *.system)
-# --------------------------------------------------------------
+gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
+    -Wall -pedantic -I"$inc_dir" -DRUN_SCALAR \
+    -o "$build_dir/mv_foam_scalar" "${common_sources[@]}"
+
+gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
+    -Wall -pedantic -I"$inc_dir" -DRUN_VECTOR \
+    -o "$build_dir/mv_foam_vector" "${common_sources[@]}"
+
+# ───────────────────── dataset OpenFOAM ──────────────────
 dataset_dir="$proj_root/data/cylinder"
-sizes=(
+mats=(
   "$dataset_dir/2000.system"
   "$dataset_dir/8000.system"
   "$dataset_dir/32k.system"
   "$dataset_dir/128k.system"
 )
-# --------------------------------------------------------------
-# 4.  final CSV (overwritten every time)
-# --------------------------------------------------------------
+
+# ───────────────────── CSV header ────────────────────────
 out="$data_dir/mv_foam_perf_full.csv"
-echo "file,n,nnz_max,time_serial,time_vectorized,speedup_time,"\
-"cycles_serial,cycles_vector,speedup_cycles,pass,"\
-"L1-loads,L1-misses,LLC-loads,LLC-misses" > "$out"
+printf '%s\n' \
+"file,n,nnz_max,"\
+"time_serial,time_vectorized,speedup_time,"\
+"cycles_serial,cycles_vector,speedup_cycles,"\
+"pass,"\
+"L1-loads,L1-misses,LLC-loads,LLC-misses,L2-loads,L2-misses" \
+> "$out"
 
-# --------------------------------------------------------------
-# 5.  Main loop 
-# --------------------------------------------------------------
-for f in "${sizes[@]}"; do  # for each file in the dataset
-    echo "Profiling $f …"
+# ───────────────────── helper merge_line ─────────────────
+merge_line() {          # merge_line scalar_csv vector_csv l1 l1m llc llcm l2a l2m
+  IFS=',' read -ra S <<<"$1"; IFS=',' read -ra V <<<"$2"
+  n=${S[0]} nnz=${S[1]}
+  tS=${S[2]} cS=${S[5]}
+  tV=${V[3]} cV=${V[6]} pass=${V[8]}
+  nz(){ [[ $1 =~ ^([0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?)$ ]] && echo "$1" || echo 0; }
+  spdT=$(awk "BEGIN{a=$(nz "$tS");b=$(nz "$tV");print (a>0&&b>0)?a/b:NaN}")
+  spdC=$(awk "BEGIN{a=$(nz "$cS");b=$(nz "$cV");print (a>0&&b>0)?a/b:NaN}")
+  printf '%s,%s,' "$n" "$nnz"
+  printf '%.6f,%.6f,%.6f,' "$tS" "$tV" "$spdT"
+  printf '%s,%s,%.6f,'     "$cS" "$cV" "$spdC"
+  printf '%s,'              "$pass"
+  printf '%s,%s,%s,%s,%s,%s\n' "$3" "$4" "$5" "$6" "$7" "$8"
+}
 
-    tmp_csv=$(mktemp)   # will produce the CSV line from mv_foam_perf
-    tmp_perf=$(mktemp)  # will contain data from perf stat
+# ───────────────────── main loop ────────────────────────
+for f in "${mats[@]}"; do
+  echo "Profiling $(basename "$f") …"
 
-    # set the environment variable for the CSV output and run perf stat
-    MV_CSV="$tmp_csv" \
-    perf stat -e L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses \
-        -x, --output "$tmp_perf" \
-        -- "$build_dir/mv_foam_perf" "$f"   
+  tmpS=$(mktemp) tmpV=$(mktemp)
+  tmpP1=$(mktemp) tmpP2=$(mktemp) tmpP3=$(mktemp)
 
-    # extract the last line from the temporary CSV file
-    line=$(tail -n 1 "$tmp_csv")
+  # ---------- scalar ------------------------------------
+  MV_CSV="$tmpS" "$build_dir/mv_foam_scalar" "$f"
 
-    # extract the performance counters from the perf output using awk
-    read l1 l1m llc llcm <<< "$(
-        awk -F',' '
-            $3=="L1-dcache-loads"       { gsub(/[^0-9]/,"",$1); l1=$1 }
-            $3=="L1-dcache-load-misses" { gsub(/[^0-9]/,"",$1); l1m=$1 }
-            $3=="LLC-loads"             { gsub(/[^0-9]/,"",$1); llc=$1 }
-            $3=="LLC-load-misses"       { gsub(/[^0-9]/,"",$1); llcm=$1 }
-            END { print l1, l1m, llc, llcm }
-        ' "$tmp_perf"
-    )"
+  # ---------- vector – PASS 1 (L1) -----------------------
+  perf stat -e '{L1-dcache-loads,L1-dcache-load-misses}' \
+    -x, --output "$tmpP1" -- \
+    env MV_CSV="$tmpV" "$build_dir/mv_foam_vector" "$f"
 
-    fname=$(basename "$f")            # extract the filename from the full path
-    echo "$fname,$line,$l1,$l1m,$llc,$llcm" >> "$out"   # append the line to the CSV file
+  # ---------- vector – PASS 2 (LLC alias) ---------------
+  perf stat -e '{LLC-loads,LLC-load-misses}' \
+    -x, --output "$tmpP2" -- \
+    "$build_dir/mv_foam_vector" "$f"
 
-    rm "$tmp_csv" "$tmp_perf"   # remove temporary files
+  # ---------- vector – PASS 3 (L2) -----------------------
+  perf stat -e '{r10,r11}' \
+    -x, --output "$tmpP3" -- \
+    "$build_dir/mv_foam_vector" "$f"
+
+  # ---------- estrazione contatori ----------------------
+  read l1 l1m <<<"$(awk -F',' '
+     $3=="L1-dcache-loads"       {gsub(/[^0-9]/,"",$1); l1=$1}
+     $3=="L1-dcache-load-misses" {gsub(/[^0-9]/,"",$1); l1m=$1}
+     END{print l1,l1m}' "$tmpP1")"
+
+  read llc llcm <<<"$(awk -F',' '
+     $3=="LLC-loads"       {gsub(/[^0-9]/,"",$1); llc=$1}
+     $3=="LLC-load-misses" {gsub(/[^0-9]/,"",$1); llcm=$1}
+     END{print llc,llcm}' "$tmpP2")"
+
+  read l2a l2m <<<"$(awk -F',' '
+     $3=="r10" {gsub(/[^0-9]/,"",$1); l2a=$1}
+     $3=="r11" {gsub(/[^0-9]/,"",$1); l2m=$1}
+     END{print l2a,l2m}' "$tmpP3")"
+
+  merge_line "$(tail -n1 "$tmpS")" "$(tail -n1 "$tmpV")" \
+             "$l1" "$l1m" "$llc" "$llcm" "$l2a" "$l2m" \
+  | sed "s#^#$(basename "$f"),#" >> "$out"
+
+  rm "$tmpS" "$tmpV" "$tmpP1" "$tmpP2" "$tmpP3"
 done
 
-echo "Done -> $out"
+echo "Done  →  $out"

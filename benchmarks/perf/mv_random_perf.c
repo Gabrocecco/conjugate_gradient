@@ -1,16 +1,16 @@
 /* ──────────────────────────────────────────────────────────────
-   random_mv_perf.c        • RV64  (no flush, no “full” mode)
-   Benchmark: symmetric sparse ELL × vector
-               – scalar   vs.  RVV-VLSET
+   random_mv_perf.c    
+   Benchmark: symmetric sparse ELL x vector
+                scalar   vs.  RVV
    Build examples (see run script):
      gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
          -Wall -pedantic -I../../include \
          -DRUN_SCALAR -o ../../build/mv_scalar random_mv_perf.c ...
-     gcc … -DRUN_VECTOR -o ../../build/mv_vector  random_mv_perf.c ...
+     gcc -DRUN_VECTOR -o ../../build/mv_vector  random_mv_perf.c ...
    ----------------------------------------------------------------
    Compile-time profile selector
-   •  -DRUN_SCALAR    → only scalar loop is built
-   •  -DRUN_VECTOR    → only vector loop is built
+   •  -DRUN_SCALAR -> only scalar loop is built
+   •  -DRUN_VECTOR -> only vector loop is built
    Never define both and never run a “full” build.
    ---------------------------------------------------------------- */
 

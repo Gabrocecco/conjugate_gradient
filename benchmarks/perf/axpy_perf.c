@@ -1,199 +1,190 @@
-/* axpy_perf.c  – double-precision version
-   Build:
-     gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d \
-         -Wall -pedantic -I../../include \
-         -o /conjugate_gradient_laptop/build/axpy_perf \
-         ../../src/vectorized.c ../../src/common.c axpy_perf.c
-  
-   Usage:
-     ./axpy_perf <num_elements>
-     (The program runs the scalar and vector kernels N_TESTS times and prints / appends the average.)
-  
-   Configuration: N_TESTS controls the number of timed repetitions.
-*/
+/* axpy_perf.c – double-precision AXPY benchmark (scalar vs. RVV)
+ * ----------------------------------------------------------------------------
+ * This version mirrors the "profile-isolation" pattern already used in
+ * mv_random_perf.c and mv_foam_perf.c:
+ *   • Compile with -DRUN_SCALAR or -DRUN_VECTOR (never both) to build only the
+ *     desired kernel and its timing/CSV code – no dead branches.
+ *   • All averages and CSV output fields are populated only for the kernels
+ *     that were actually run; missing metrics are emitted as NaN.
+ *   • Warm-up executes only the selected profile(s).
+ * ----------------------------------------------------------------------------
+ * Build examples:
+ *   gcc -O3 -std=c11 -march=rv64gc_xtheadvector -mabi=lp64d -Wall -pedantic \
+ *       -I../../include -DRUN_SCALAR -o ../../build/axpy_scalar \
+ *       ../../src/vectorized.c ../../src/common.c axpy_perf.c
+ *   gcc … -DRUN_VECTOR -o ../../build/axpy_vector …
+ * ----------------------------------------------------------------------------
+ * Usage:
+ *   ./axpy_<profile> <num_elements>   # averages over N_TESTS runs
+ */
 
-// -----------------------------------------------------------------------------
 #define _POSIX_C_SOURCE 200112L
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
-#include <stdlib.h>
-#include <assert.h>
 #include <time.h>
+#include <assert.h>
 #include <inttypes.h>
-#include <riscv_vector.h>
-#include "common.h"
-#include "vectorized.h"  // saxpy_vec_tutorial_double_vlset_opt()
 
-#ifndef N_TESTS
-#define N_TESTS 100        // number of timed repetitions
+#include "common.h"
+#include "vectorized.h"   /* saxpy_vec_tutorial_double_vlset_opt() */
+
+/*────────────────── compile-time profile selector ───────────────*/
+#if defined(RUN_SCALAR) && defined(RUN_VECTOR)
+# error "Define either RUN_SCALAR or RUN_VECTOR, not both"
+#endif
+#if !defined(RUN_SCALAR) && !defined(RUN_VECTOR)
+# error "Define at least one profile macro (RUN_SCALAR or RUN_VECTOR)"
 #endif
 
-// -----------------------------------------------------------------------------
-// aligned_alloc fallback for toolchains without C11 aligned_alloc()
-// -----------------------------------------------------------------------------
-// #if (__STDC_VERSION__ < 201112L) || (defined(__APPLE__) && !defined(aligned_alloc))
-// static void *aligned_malloc(size_t alignment, size_t size)
-// {
-//     void *ptr = NULL;
-//     if (posix_memalign(&ptr, alignment, size) != 0) ptr = NULL;
-//     return ptr;
-// }
-// #define aligned_alloc(alignment, size) aligned_malloc(alignment, size)
-// #endif
+#ifdef RUN_SCALAR
+# define DO_SCALAR 1
+#else
+# define DO_SCALAR 0
+#endif
+#ifdef RUN_VECTOR
+# define DO_VECTOR 1
+#else
+# define DO_VECTOR 0
+#endif
 
-static inline double timespec_to_sec(struct timespec t){return t.tv_sec + t.tv_nsec * 1e-9;}
+#ifndef N_TESTS
+# define N_TESTS 100        /* timed repetitions */
+#endif
 
-static inline uint64_t read_rdcycle(void)
-{
-    uint64_t cycle;
-    __asm__ volatile("rdcycle %0" : "=r"(cycle));
-    return cycle;
-}
+/*────────────────── helpers ─────────────────*/
+static inline double ts_to_sec(struct timespec t)
+{ return t.tv_sec + 1e-9 * t.tv_nsec; }
 
-static inline uint64_t diff64(uint64_t s, uint64_t e) { return e >= s ? e - s : UINT64_MAX - s + 1 + e; }
+static inline uint64_t diff64(uint64_t s, uint64_t e)
+{ return e >= s ? e - s : UINT64_MAX - s + 1 + e; }
 
-// -----------------------------------------------------------------------------
-// Scalar double-precision AXPY: y = a * x + y
-// -----------------------------------------------------------------------------
+static inline uint64_t rdcycle64(void)
+{ uint64_t c; __asm__ volatile("rdcycle %0" : "=r"(c)); return c; }
+
+/*────────────────── scalar kernel ─────────────────*/
 static void saxpy_scalar(size_t n, double a, const double *x, double *y)
 {
-    for (size_t i = 0; i < n; ++i)
-        y[i] = a * x[i] + y[i];
+    for (size_t i = 0; i < n; ++i) y[i] = a * x[i] + y[i];
 }
 
+/*────────────────── main ─────────────────*/
 int main(int argc, char **argv)
 {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <num_elements>\n", argv[0]);
         return EXIT_FAILURE;
     }
-
     size_t n = strtoull(argv[1], NULL, 10);
-    if (n == 0) {
-        fprintf(stderr, "<num_elements> must be > 0\n");
-        return EXIT_FAILURE;
-    }
+    if (n == 0) { fputs("<num_elements> must be > 0\n", stderr); return EXIT_FAILURE; }
 
     const double a = 2.0;
 
-    // ---------------------------------------------------------------------
-    // Allocate buffers
-    // ---------------------------------------------------------------------
-    // double *x       = aligned_alloc(64, n * sizeof(double));
-    // double *y_init  = aligned_alloc(64, n * sizeof(double));
-    // double *y_ref   = aligned_alloc(64, n * sizeof(double));
-    // double *y_vec   = aligned_alloc(64, n * sizeof(double));
-
-    double *x = malloc(n * sizeof(double));
-    double *y_init = malloc(n * sizeof(double));
-    double *y_ref = malloc(n * sizeof(double));
-    double *y_vec = malloc(n * sizeof(double));
-
-    assert(x && y_init && y_ref && y_vec);
+    /* allocate vectors */
+    double *x  = malloc(n * sizeof *x);
+    double *y0 = malloc(n * sizeof *y0);   /* initial y */
+    double *yS = DO_SCALAR ? malloc(n * sizeof *yS) : NULL;
+    double *yV = DO_VECTOR ? malloc(n * sizeof *yV) : NULL;
+    assert(x && y0 && (!DO_SCALAR || yS) && (!DO_VECTOR || yV));
 
     srand(42);
     for (size_t i = 0; i < n; ++i) {
-        x[i]      = rand() / (double)RAND_MAX;
-        y_init[i] = rand() / (double)RAND_MAX;
+        x[i]  = rand() / (double)RAND_MAX;
+        y0[i] = rand() / (double)RAND_MAX;
     }
+    if (DO_SCALAR) memcpy(yS, y0, n * sizeof *yS);
+    if (DO_VECTOR) memcpy(yV, y0, n * sizeof *yV);
 
-    memcpy(y_ref, y_init, n * sizeof(double));
-    memcpy(y_vec, y_init, n * sizeof(double));
+    /* warm-up */
+#if DO_SCALAR
+    saxpy_scalar(n, a, x, yS);
+    memcpy(yS, y0, n * sizeof *yS);
+#endif
+#if DO_VECTOR
+    saxpy_vec_tutorial_double_vlset_opt(n, a, x, yV);
+    memcpy(yV, y0, n * sizeof *yV);
+#endif
 
-    // Warm-up
-    saxpy_scalar(n, a, x, y_ref);
-    memcpy(y_ref, y_init, n * sizeof(double));
-    saxpy_vec_tutorial_double_vlset_opt(n, a, x, y_vec);  // RVV kernel (double)
-    memcpy(y_vec, y_init, n * sizeof(double));
+    /* timed loops */
+    struct timespec t0, t1;
+    double t_s_sum = 0., t_v_sum = 0.;
+    uint64_t c_s_sum = 0, c_v_sum = 0;
 
-    // ---------------------------------------------------------------------
-    // Timed repetitions
-    // ---------------------------------------------------------------------
-    double   t_scalar_sum = 0.0, t_vector_sum = 0.0;
-    uint64_t c_scalar_sum = 0,    c_vector_sum = 0;
+#if DO_SCALAR
+    for (int it = 0; it < N_TESTS; ++it) {
+        memcpy(yS, y0, n * sizeof *yS);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
+        uint64_t c0 = rdcycle64();
 
-    struct timespec ts0, ts1;
+        saxpy_scalar(n, a, x, yS);
 
-    for (int iter = 0; iter < N_TESTS; ++iter) {
-        // Scalar
-        memcpy(y_ref, y_init, n * sizeof(double));
-        uint64_t start_cycles = read_rdcycle();
-        clock_gettime(CLOCK_MONOTONIC_RAW, &ts0);
-        saxpy_scalar(n, a, x, y_ref);
-        clock_gettime(CLOCK_MONOTONIC_RAW, &ts1);
-        uint64_t end_cycles = read_rdcycle();
-
-        t_scalar_sum += timespec_to_sec((struct timespec){ts1.tv_sec - ts0.tv_sec,
-                                                         ts1.tv_nsec - ts0.tv_nsec});
-        // c_scalar_sum += end_cycles - start_cycles;
-        c_scalar_sum += diff64(start_cycles, end_cycles);
-
-        // Vector
-        memcpy(y_vec, y_init, n * sizeof(double));
-        start_cycles = read_rdcycle();
-        clock_gettime(CLOCK_MONOTONIC_RAW, &ts0);
-        saxpy_vec_tutorial_double_vlset_opt(n, a, x, y_vec);
-        clock_gettime(CLOCK_MONOTONIC_RAW, &ts1);
-        end_cycles = read_rdcycle();
-
-        t_vector_sum += timespec_to_sec((struct timespec){ts1.tv_sec - ts0.tv_sec,
-                                                         ts1.tv_nsec - ts0.tv_nsec});
-        // c_vector_sum += end_cycles - start_cycles;
-        c_vector_sum += diff64(start_cycles, end_cycles);
+        uint64_t c1 = rdcycle64();
+        clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+        t_s_sum += ts_to_sec((struct timespec){ t1.tv_sec - t0.tv_sec, t1.tv_nsec - t0.tv_nsec });
+        c_s_sum += diff64(c0, c1);
     }
+#endif
+#if DO_VECTOR
+    for (int it = 0; it < N_TESTS; ++it) {
+        memcpy(yV, y0, n * sizeof *yV);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &t0);
+        uint64_t c0 = rdcycle64();
 
-    const double   t_scalar_avg = t_scalar_sum / N_TESTS;
-    const double   t_vector_avg = t_vector_sum / N_TESTS;
-    const uint64_t c_scalar_avg = c_scalar_sum / N_TESTS;
-    const uint64_t c_vector_avg = c_vector_sum / N_TESTS;
+        saxpy_vec_tutorial_double_vlset_opt(n, a, x, yV);
 
-    // Correctness check
+        uint64_t c1 = rdcycle64();
+        clock_gettime(CLOCK_MONOTONIC_RAW, &t1);
+        t_v_sum += ts_to_sec((struct timespec){ t1.tv_sec - t0.tv_sec, t1.tv_nsec - t0.tv_nsec });
+        c_v_sum += diff64(c0, c1);
+    }
+#endif
+
+    /* averages (or NaN if not run) */
+    double t_s = DO_SCALAR ? t_s_sum / N_TESTS : NAN;
+    double c_s = DO_SCALAR ? (double)c_s_sum / N_TESTS : NAN;
+    double t_v = DO_VECTOR ? t_v_sum / N_TESTS : NAN;
+    double c_v = DO_VECTOR ? (double)c_v_sum / N_TESTS : NAN;
+
+    /* correctness */
     int pass = 1;
-    for (size_t i = 0; i < n; ++i) {
-        if (fabs(y_ref[i] - y_vec[i]) > 1e-6) { pass = 0; break; }
-    }
+#if DO_SCALAR && DO_VECTOR
+    for (size_t i = 0; i < n; ++i)
+        if (fabs(yS[i] - yV[i]) > 1e-6) { pass = 0; break; }
+#endif
 
-    // Console output
-    printf("n                 : %zu (average of %d runs)\n"
-           "Time  (scalar)    : %.6f s\n"
-           "Time  (vectorized): %.6f s\n"
-           "Speed-up (time)   : %.2fx\n\n"
-           "Cycles (scalar)   : %" PRIu64 "\n"
-           "Cycles (vectorized): %" PRIu64 "\n"
-           "Speed-up (cycles) : %.2fx\n\n"
-           "%s\n",
-           n, N_TESTS,
-           t_scalar_avg, t_vector_avg, t_scalar_avg / t_vector_avg,
-           c_scalar_avg, c_vector_avg, (double)c_scalar_avg / (double)c_vector_avg,
-           pass ? "PASS (results match)" : "FAIL (mismatch)");
+    /* console */
+    printf("n=%zu\n", n);
+#if DO_SCALAR
+    printf("scalar: time=%.6f s  cycles=%.0f\n", t_s, c_s);
+#endif
+#if DO_VECTOR
+    printf("vector: time=%.6f s  cycles=%.0f\n", t_v, c_v);
+#endif
+#if DO_SCALAR && DO_VECTOR
+    printf("speed-up: time=%.2f× cycles=%.2f×\n", t_s / t_v, c_s / c_v);
+#endif
+    printf("%s\n", pass ? "PASS" : "FAIL");
 
-    // CSV handling
+    /* CSV */
     const char *csv_path = getenv("AXPY_CSV");
     if (!csv_path) csv_path = "axpy_perf.csv";
-
     FILE *csv = fopen(csv_path, "a");
     if (csv) {
-        fseek(csv, 0, SEEK_END);
         if (ftell(csv) == 0) {
-            fprintf(csv,
-                    "n,time_serial,time_vectorized,speedup_time,cycles_serial,cycles_vector,speedup_cycles,pass\n");
+            fprintf(csv, "n,time_scalar,time_vector,speedup_time,cycles_scalar,cycles_vector,speedup_cycles,pass\n");
         }
-        fprintf(csv,
-                "%zu,%.6f,%.6f,%.2f,%.2f,%.2f,%.2f,%s\n",
-                n,
-                t_scalar_avg, t_vector_avg,
-                t_scalar_avg / t_vector_avg,
-                (double)c_scalar_avg, (double)c_vector_avg,
-                (double)c_scalar_avg / (double)c_vector_avg,
-                pass ? "PASS" : "FAIL");
+        fprintf(csv, "%zu,%.6f,%.6f,%.2f,%.0f,%.0f,%.2f,%s\n",
+                n, t_s, t_v, (DO_SCALAR&&DO_VECTOR)?t_s/t_v:NAN,
+                c_s, c_v, (DO_SCALAR&&DO_VECTOR)?c_s/c_v:NAN,
+                pass?"PASS":"FAIL");
         fclose(csv);
     }
 
-    free(x);
-    free(y_init);
-    free(y_ref);
-    free(y_vec);
+    /* cleanup */
+    free(x); free(y0);
+    if (DO_SCALAR) free(yS);
+    if (DO_VECTOR) free(yV);
     return pass ? EXIT_SUCCESS : EXIT_FAILURE;
 }
